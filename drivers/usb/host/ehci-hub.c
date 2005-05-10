@@ -347,6 +347,7 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 		udelay(150);
 
 	/* turn off now-idle HC */
+	del_timer_sync (&ehci->watchdog);
 	ehci_halt (ehci);
 
 	spin_lock_irq(&ehci->lock);
