@@ -456,6 +456,8 @@ static int usblp_open(struct inode *inode, struct file *file)
 	usblp->wcomplete = 1; /* we begin writeable */
 	usblp->wstatus = 0;
 	usblp->rcomplete = 0;
+	usblp->writeurb->status = 0;
+	usblp->readurb->status = 0;
 
 	if (handle_bidir(usblp) < 0) {
 		usb_autopm_put_interface(intf);
