@@ -519,6 +519,8 @@ static int __init init_pstore_fs(void)
 	struct proc_dir_entry *last_kmsg_entry = NULL;
 #endif
 
+	pstore_choose_compression();
+
 	/* Create a convenient mount point for people to access pstore */
 	err = sysfs_create_mount_point(fs_kobj, "pstore");
 	if (err)
