@@ -548,6 +548,7 @@ config ARM64_ERRATUM_1742098
 	bool "Cortex-A57/A72: 1742098: ELR recorded incorrectly on interrupt taken between cryptographic instructions in a sequence"
 	depends on COMPAT
 	default y
+	select ARM_ARCH_TIMER_OOL_WORKAROUND
 	help
 	  This option removes the AES hwcap for aarch32 user-space to
 	  workaround erratum 1742098 on Cortex-A57 and Cortex-A72.
