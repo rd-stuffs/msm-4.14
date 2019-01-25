@@ -236,6 +236,8 @@ struct drm_bridge_funcs {
 	 * The enable callback is optional.
 	 */
 	void (*enable)(struct drm_bridge *bridge);
+
+	void (*disp_param_set)(struct drm_bridge *bridge, int cmd);
 };
 
 /**
