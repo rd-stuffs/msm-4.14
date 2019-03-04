@@ -131,6 +131,8 @@
  * for droop mitigation
  */
 #define ADRENO_ACD BIT(17)
+/* Indicates that the specific target is no longer supported */
+#define ADRENO_DEPRECATED BIT(20)
 
 /*
  * Adreno GPU quirks - control bits for various workarounds

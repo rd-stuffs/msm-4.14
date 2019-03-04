@@ -674,18 +674,34 @@ static int adreno_update_soc_hw_revision_quirks(
 	return 0;
 }
 
-static void
-adreno_identify_gpu(struct adreno_device *adreno_dev)
+static int adreno_identify_gpu(struct adreno_device *adreno_dev)
 {
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	const struct adreno_reg_offsets *reg_offsets;
 	struct adreno_gpudev *gpudev;
 	int i;
 
 	adreno_dev->gpucore = _get_gpu_core(adreno_dev->chipid);
 
-	if (adreno_dev->gpucore == NULL)
-		KGSL_DRV_FATAL(KGSL_DEVICE(adreno_dev),
+	if (adreno_dev->gpucore == NULL) {
+		dev_crit(&device->pdev->dev,
 			"Unknown GPU chip ID %8.8X\n", adreno_dev->chipid);
+		return -ENODEV;
+	}
+
+	/*
+	 * Identify non-longer supported targets and spins and print a helpful
+	 * message
+	 */
+	if (adreno_dev->gpucore->features & ADRENO_DEPRECATED) {
+		dev_err(&device->pdev->dev,
+			"Support for GPU %d.%d.%d.%d has been deprecated\n",
+			adreno_dev->gpucore->core,
+			adreno_dev->gpucore->major,
+			adreno_dev->gpucore->minor,
+			adreno_dev->gpucore->patchid);
+		return -ENODEV;
+	}
 
 	/*
 	 * The gmem size might be dynamic when ocmem is involved so copy it out
@@ -713,6 +729,8 @@ adreno_identify_gpu(struct adreno_device *adreno_dev)
 	/* Do target specific identification */
 	if (gpudev->platform_setup != NULL)
 		gpudev->platform_setup(adreno_dev);
+
+	return 0;
 }
 
 static const struct platform_device_id adreno_id_table[] = {
@@ -1309,7 +1327,8 @@ static int adreno_probe(struct platform_device *pdev)
 	adreno_update_soc_hw_revision_quirks(adreno_dev, pdev);
 
 	/* Get the chip ID from the DT and set up target specific parameters */
-	adreno_identify_gpu(adreno_dev);
+	if (adreno_identify_gpu(adreno_dev))
+		return -ENODEV;
 
 	status = adreno_of_get_power(adreno_dev, pdev);
 	if (status) {
