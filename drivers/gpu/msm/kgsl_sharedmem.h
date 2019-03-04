@@ -271,7 +271,7 @@ static inline uint64_t
 kgsl_memdesc_footprint(const struct kgsl_memdesc *memdesc)
 {
 	return ALIGN(memdesc->size + kgsl_memdesc_guard_page_size(memdesc),
-		memdesc->pad_to);
+		PAGE_SIZE);
 }
 
 /*
