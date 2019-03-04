@@ -655,25 +655,6 @@ static inline unsigned int kgsl_gpuid(struct kgsl_device *device,
 	return device->ftbl->gpuid(device, chipid);
 }
 
-static inline int kgsl_create_device_sysfs_files(struct device *root,
-	const struct device_attribute **list)
-{
-	int ret = 0, i;
-
-	for (i = 0; list[i] != NULL; i++)
-		ret |= device_create_file(root, list[i]);
-	return ret;
-}
-
-static inline void kgsl_remove_device_sysfs_files(struct device *root,
-	const struct device_attribute **list)
-{
-	int i;
-
-	for (i = 0; list[i] != NULL; i++)
-		device_remove_file(root, list[i]);
-}
-
 static inline struct kgsl_device *kgsl_device_from_dev(struct device *dev)
 {
 	int i;
