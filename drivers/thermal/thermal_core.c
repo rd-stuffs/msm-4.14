@@ -491,6 +491,7 @@ static void thermal_zone_device_init(struct thermal_zone_device *tz)
 
 	tz->prev_low_trip = -INT_MAX;
 	tz->prev_high_trip = INT_MAX;
+
 	list_for_each_entry(pos, &tz->thermal_instances, tz_node)
 		pos->initialized = false;
 }
