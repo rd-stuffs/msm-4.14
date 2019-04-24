@@ -819,8 +819,6 @@ struct rq {
 #ifdef CONFIG_NO_HZ_FULL
 	unsigned long last_sched_tick;
 #endif
-	/* capture load from *all* tasks on this cpu: */
-	struct load_weight load;
 	unsigned long nr_load_updates;
 	u64 nr_switches;
 
