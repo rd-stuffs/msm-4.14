@@ -1474,11 +1474,7 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 #endif
 }
 
-/*
- * Tunables that become constants when CONFIG_SCHED_DEBUG is off:
- */
-# include <linux/static_key.h>
-# define const_debug __read_mostly
+#define const_debug __read_mostly
 
 #define sched_feat(x) SCHED_FEAT_##x
 
@@ -1889,7 +1885,7 @@ extern void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags);
 
 extern const_debug unsigned int sysctl_sched_time_avg;
 extern const_debug unsigned int sysctl_sched_nr_migrate;
-extern const_debug unsigned int sysctl_sched_migration_cost;
+extern unsigned int __read_mostly sysctl_sched_migration_cost;
 
 static inline u64 sched_avg_period(void)
 {
