@@ -14,7 +14,7 @@
 #define _ION_KERNEL_H
 
 #include <linux/dma-buf.h>
-#include "../uapi/ion.h"
+#include <uapi/linux/ion.h>
 
 #ifdef CONFIG_ION
 
