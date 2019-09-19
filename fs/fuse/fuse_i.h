@@ -100,8 +100,8 @@ struct fuse_inode {
 	/** Waitq for writepage completion */
 	wait_queue_head_t page_waitq;
 
-	/** List of writepage requestst (pending or sent) */
-	struct list_head writepages;
+	/** RB-tree of writepage requests (pending or sent) */
+	struct rb_root writepages;
 
 	/** Miscellaneous bits describing inode state */
 	unsigned long state;
@@ -395,8 +395,8 @@ struct fuse_req {
 	/** AIO control block */
 	struct fuse_io_priv *io;
 
-	/** Link on fi->writepages */
-	struct list_head writepages_entry;
+	/** RB-node on fi->writepages */
+	struct rb_node writepages_entry;
 
 	/** Request completion callback */
 	void (*end)(struct fuse_conn *, struct fuse_req *);
