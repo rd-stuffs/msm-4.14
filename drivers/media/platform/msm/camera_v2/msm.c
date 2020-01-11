@@ -1416,14 +1416,14 @@ static int msm_probe(struct platform_device *pdev)
 	cam_debugfs_root = debugfs_create_dir(MSM_CAM_LOGSYNC_FILE_BASEDIR,
 						NULL);
 	if (!cam_debugfs_root) {
-		pr_warn("NON-FATAL: failed to create logsync base directory\n");
+		pr_debug("NON-FATAL: failed to create logsync base directory\n");
 	} else {
 		if (!debugfs_create_file(MSM_CAM_LOGSYNC_FILE_NAME,
 					 0660,
 					 cam_debugfs_root,
 					 NULL,
 					 &logsync_fops))
-			pr_warn("NON-FATAL: failed to create logsync debugfs file\n");
+			pr_debug("NON-FATAL: failed to create logsync debugfs file\n");
 	}
 
 	rc = cam_ahb_clk_init(pdev);

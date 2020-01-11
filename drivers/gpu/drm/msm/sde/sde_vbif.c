@@ -581,7 +581,7 @@ int sde_debugfs_vbif_init(struct sde_kms *sde_kms, struct dentry *debugfs_root)
 
 	sde_kms->debugfs_vbif = debugfs_create_dir("vbif", debugfs_root);
 	if (!sde_kms->debugfs_vbif) {
-		SDE_ERROR("failed to create vbif debugfs\n");
+		pr_debug("failed to create vbif debugfs\n");
 		return -EINVAL;
 	}
 

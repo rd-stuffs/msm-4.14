@@ -910,14 +910,14 @@ static int sde_rotator_base_create_debugfs(
 {
 	if (!debugfs_create_u32("iommu_ref_cnt", 0444,
 			debugfs_root, &mdata->iommu_ref_cnt)) {
-		SDEROT_WARN("failed to create debugfs iommu ref cnt\n");
+		SDEROT_DBG("failed to create debugfs iommu ref cnt\n");
 		return -EINVAL;
 	}
 
 	mdata->clk_always_on = false;
 	if (!debugfs_create_bool("clk_always_on", 0644,
 			debugfs_root, &mdata->clk_always_on)) {
-		SDEROT_WARN("failed to create debugfs clk_always_on\n");
+		SDEROT_DBG("failed to create debugfs clk_always_on\n");
 		return -EINVAL;
 	}
 
@@ -937,25 +937,25 @@ static int sde_rotator_core_create_debugfs(
 
 	if (!debugfs_create_u32("hwacquire_timeout", 0644,
 			debugfs_root, &mgr->hwacquire_timeout)) {
-		SDEROT_WARN("failed to create debugfs hw acquire timeout\n");
+		SDEROT_DBG("failed to create debugfs hw acquire timeout\n");
 		return -EINVAL;
 	}
 
 	if (!debugfs_create_u32("ppc_numer", 0644,
 			debugfs_root, &mgr->pixel_per_clk.numer)) {
-		SDEROT_WARN("failed to create debugfs ppc numerator\n");
+		SDEROT_DBG("failed to create debugfs ppc numerator\n");
 		return -EINVAL;
 	}
 
 	if (!debugfs_create_u32("ppc_denom", 0644,
 			debugfs_root, &mgr->pixel_per_clk.denom)) {
-		SDEROT_WARN("failed to create debugfs ppc denominator\n");
+		SDEROT_DBG("failed to create debugfs ppc denominator\n");
 		return -EINVAL;
 	}
 
 	if (!debugfs_create_u64("enable_bw_vote", 0644,
 			debugfs_root, &mgr->enable_bw_vote)) {
-		SDEROT_WARN("failed to create enable_bw_vote\n");
+		SDEROT_DBG("failed to create enable_bw_vote\n");
 		return -EINVAL;
 	}
 

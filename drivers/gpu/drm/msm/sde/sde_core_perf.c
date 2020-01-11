@@ -825,7 +825,7 @@ int sde_core_perf_debugfs_init(struct sde_core_perf *perf,
 
 	perf->debugfs_root = debugfs_create_dir("core_perf", parent);
 	if (!perf->debugfs_root) {
-		SDE_ERROR("failed to create core perf debugfs\n");
+		pr_debug("failed to create core perf debugfs\n");
 		return -EINVAL;
 	}
 

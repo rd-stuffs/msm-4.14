@@ -198,7 +198,7 @@ static int sde_debugfs_danger_init(struct sde_kms *sde_kms,
 	sde_kms->debugfs_danger = debugfs_create_dir("danger",
 			parent);
 	if (!sde_kms->debugfs_danger) {
-		SDE_ERROR("failed to create danger debugfs\n");
+		pr_debug("failed to create danger debugfs\n");
 		return -EINVAL;
 	}
 

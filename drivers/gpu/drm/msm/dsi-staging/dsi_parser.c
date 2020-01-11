@@ -1166,7 +1166,7 @@ int dsi_parser_dbg_init(void *parser, struct dentry *parent_dir)
 	if (IS_ERR_OR_NULL(dir)) {
 		rc = PTR_ERR(dir);
 
-		pr_err("failed to create parser debugfs\n");
+		pr_debug("failed to create parser debugfs\n");
 		goto end;
 	}
 
@@ -1175,7 +1175,7 @@ int dsi_parser_dbg_init(void *parser, struct dentry *parent_dir)
 	if (IS_ERR_OR_NULL(file)) {
 		rc = PTR_ERR(file);
 
-		pr_err("failed to create init debugfs\n");
+		pr_debug("failed to create init debugfs\n");
 		goto dbg;
 	}
 
@@ -1184,7 +1184,7 @@ int dsi_parser_dbg_init(void *parser, struct dentry *parent_dir)
 	if (IS_ERR_OR_NULL(file)) {
 		rc = PTR_ERR(file);
 
-		pr_err("failed to create init debugfs\n");
+		pr_debug("failed to create init debugfs\n");
 		goto dbg;
 	}
 
