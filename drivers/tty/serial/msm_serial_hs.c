@@ -3432,7 +3432,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 			ipc_log_context_create(IPC_MSM_HS_LOG_STATE_PAGES,
 								name, 0);
 	if (!msm_uport->ipc_msm_hs_log_ctxt) {
-		dev_err(&pdev->dev, "%s(): error creating logging context\n",
+		dev_dbg(&pdev->dev, "%s(): error creating logging context\n",
 								__func__);
 	} else {
 		msm_uport->ipc_debug_mask = INFO_LEV;
@@ -3522,7 +3522,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 	msm_uport->tx.ipc_tx_ctxt =
 		ipc_log_context_create(IPC_MSM_HS_LOG_DATA_PAGES, name, 0);
 	if (!msm_uport->tx.ipc_tx_ctxt)
-		dev_err(&pdev->dev, "%s(): error creating tx log context\n",
+		dev_dbg(&pdev->dev, "%s(): error creating tx log context\n",
 								__func__);
 
 	memset(name, 0, sizeof(name));
@@ -3531,7 +3531,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 	msm_uport->rx.ipc_rx_ctxt = ipc_log_context_create(
 					IPC_MSM_HS_LOG_DATA_PAGES, name, 0);
 	if (!msm_uport->rx.ipc_rx_ctxt)
-		dev_err(&pdev->dev, "%s(): error creating rx log context\n",
+		dev_dbg(&pdev->dev, "%s(): error creating rx log context\n",
 								__func__);
 
 	memset(name, 0, sizeof(name));
@@ -3540,7 +3540,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 	msm_uport->ipc_msm_hs_pwr_ctxt = ipc_log_context_create(
 					IPC_MSM_HS_LOG_USER_PAGES, name, 0);
 	if (!msm_uport->ipc_msm_hs_pwr_ctxt)
-		dev_err(&pdev->dev, "%s(): error creating usr log context\n",
+		dev_dbg(&pdev->dev, "%s(): error creating usr log context\n",
 								__func__);
 
 	uport->irq = core_irqres;
