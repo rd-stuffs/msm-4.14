@@ -4326,8 +4326,8 @@ retry:
 		wake_all_kswapds(order, ac);
 
 	/* Boost when memory is low so allocation latency doesn't get too bad */
-	devfreq_boost_kick_max(DEVFREQ_CPU_LLCC_DDR_BW, 100);
-	devfreq_boost_kick_max(DEVFREQ_CPU_CPU_LLCC_BW, 100);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 100);
 	cpu_input_boost_kick_max(100);
 
 	reserve_flags = __gfp_pfmemalloc_flags(gfp_mask);
