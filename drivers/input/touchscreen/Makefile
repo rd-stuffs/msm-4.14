@@ -112,6 +112,6 @@ obj-$(CONFIG_TOUCHSCREEN_RASPBERRYPI_FW)        += raspberrypi-ts.o
 obj-$(CONFIG_TOUCHSCREEN_IQS5XX)        += iqs5xx.o
 obj-$(CONFIG_TOUCHSCREEN_ST)    += st/
 obj-$(CONFIG_TOUCHSCREEN_FTS)   += focaltech_touch/
-obj-$(CONFIG_TOUCHSCREEN_COMMON)	+= lct_tp_palm.o lct_tp_info.o lct_tp_selftest.o lct_tp_gesture.o lct_tp_grip_area.o lct_tp_work.o
+obj-$(CONFIG_TOUCHSCREEN_COMMON)	+= lct_tp_palm.o lct_tp_info.o lct_tp_selftest.o lct_tp_gesture.o lct_tp_grip_area.o lct_tp_work.o tp_common.o
 obj-$(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI)	+= nt36xxx_spi/
 obj-$(CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE)   += xiaomi/
