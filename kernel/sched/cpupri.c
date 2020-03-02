@@ -105,6 +105,12 @@ static inline int __cpupri_find(struct cpupri *cp, struct task_struct *p,
 	return 1;
 }
 
+int cpupri_find(struct cpupri *cp, struct task_struct *p,
+		struct cpumask *lowest_mask)
+{
+	return cpupri_find_fitness(cp, p, lowest_mask, NULL);
+}
+
 /**
  * drop_nopreempt_cpus - remove a cpu from the mask if it is likely
  *			 non-preemptible
@@ -127,7 +133,7 @@ drop_nopreempt_cpus(struct cpumask *lowest_mask)
 }
 
 /**
- * cpupri_find - find the best (lowest-pri) CPU in the system
+ * cpupri_find_fitness - find the best (lowest-pri) CPU in the system
  * @cp: The cpupri context
  * @p: The task
  * @lowest_mask: A mask to fill in with selected CPUs (or NULL)
@@ -143,7 +149,7 @@ drop_nopreempt_cpus(struct cpumask *lowest_mask)
  *
  * Return: (int)bool - CPUs were found
  */
-int cpupri_find(struct cpupri *cp, struct task_struct *p,
+int cpupri_find_fitness(struct cpupri *cp, struct task_struct *p,
 		struct cpumask *lowest_mask,
 		bool (*fitness_fn)(struct task_struct *p, int cpu))
 {
