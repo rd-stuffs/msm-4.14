@@ -1591,7 +1591,6 @@ select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags,
 	if (test || !rt_task_fits_capacity(p, cpu)) {
 		int target = find_lowest_rq(p);
 
-
 		/*
 		 * Check once for losing a race with the other core's irq
 		 * handler. This does not happen frequently, but it can avoid
@@ -1604,6 +1603,13 @@ select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags,
 		}
 
 		/*
+		 * Bail out if we were forcing a migration to find a better
+		 * fitting CPU but our search failed.
+		 */
+		if (!test && target != -1 && !rt_task_fits_capacity(p, target))
+			goto out_unlock;
+
+		/*
 		 * If cpu is non-preemptible, prefer remote cpu
 		 * even if it's running a higher-prio task.
 		 * Otherwise: Don't bother moving it if the
@@ -1614,6 +1620,8 @@ select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags,
 		    p->prio < cpu_rq(target)->rt.highest_prio.curr))
 			cpu = target;
 	}
+
+out_unlock:
 	rcu_read_unlock();
 
 out:
