@@ -18,6 +18,8 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_bridge.h>
 #include <linux/pm_wakeup.h>
+#include <drm/drm_notifier.h>
+#include <linux/notifier.h>
 
 #include "msm_kms.h"
 #include "sde_connector.h"
@@ -33,6 +35,8 @@
 #define DEFAULT_PANEL_JITTER_ARRAY_SIZE		2
 #define DEFAULT_PANEL_PREFILL_LINES	25
 
+static BLOCKING_NOTIFIER_HEAD(drm_notifier_list);
+
 static struct dsi_display_mode_priv_info default_priv_info = {
 	.panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR,
 	.panel_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR,
@@ -46,6 +50,38 @@ struct dsi_bridge *gbridge;
 static struct delayed_work prim_panel_work;
 static atomic_t prim_panel_is_on;
 static struct wakeup_source prim_panel_wakelock;
+struct drm_notify_data g_notify_data;
+
+/*
+ *	drm_register_client - register a client notifier
+ *	@nb:notifier block to callback when event happen
+ */
+int drm_register_client(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&drm_notifier_list, nb);
+}
+EXPORT_SYMBOL(drm_register_client);
+
+/*
+ *	drm_unregister_client - unregister a client notifier
+ *	@nb:notifier block to callback when event happen
+ */
+int drm_unregister_client(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&drm_notifier_list, nb);
+}
+EXPORT_SYMBOL(drm_unregister_client);
+
+/*
+ *	drm_notifier_call_chain - notify clients of drm_event
+ *
+ */
+int drm_notifier_call_chain(unsigned long val, void *v)
+{
+	return blocking_notifier_call_chain(&drm_notifier_list, val, v);
+}
+EXPORT_SYMBOL(drm_notifier_call_chain);
+
 static void convert_to_dsi_mode(const struct drm_display_mode *drm_mode,
 				struct dsi_display_mode *dsi_mode)
 {
@@ -180,6 +216,8 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 {
 	int rc = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
+	int event = DRM_BLANK_UNBLANK;
+	g_notify_data.data = &event;
 
 	if (!bridge) {
 		pr_err("Invalid params\n");
@@ -190,6 +228,8 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 		pr_err("Incorrect bridge details\n");
 		return;
 	}
+
+	drm_notifier_call_chain(DRM_EARLY_EVENT_BLANK, &g_notify_data);
 
 	atomic_set(&c_bridge->display->panel->esd_recovery_pending, 0);
 
@@ -239,6 +279,9 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 				c_bridge->id, rc);
 		(void)dsi_display_unprepare(c_bridge->display);
 	}
+
+	drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
+
 	SDE_ATRACE_END("dsi_display_enable");
 
 	rc = dsi_display_splash_res_cleanup(c_bridge->display);
@@ -358,11 +401,15 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 {
 	int rc = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
+	int event = DRM_BLANK_POWERDOWN;
+	g_notify_data.data = &event;
 
 	if (!bridge) {
 		pr_err("Invalid params\n");
 		return;
 	}
+
+	drm_notifier_call_chain(DRM_EARLY_EVENT_BLANK, &g_notify_data);
 
 	SDE_ATRACE_BEGIN("dsi_bridge_post_disable");
 	SDE_ATRACE_BEGIN("dsi_display_disable");
@@ -383,6 +430,8 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 		return;
 	}
 	SDE_ATRACE_END("dsi_bridge_post_disable");
+
+	drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
 
 	if (c_bridge->display->is_prim_display)
 		atomic_set(&prim_panel_is_on, false);
