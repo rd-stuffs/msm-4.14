@@ -315,6 +315,36 @@ static void dsi_bridge_disp_param_set(struct drm_bridge *bridge, int cmd)
 	SDE_ATRACE_END("panel_disp_param_send");
 }
 
+static ssize_t dsi_bridge_disp_param_get(struct drm_bridge *bridge, char *buf)
+{
+	struct dsi_bridge *c_bridge;
+	struct dsi_display *display;
+	struct dsi_panel *panel;
+	ssize_t ret = 0;
+
+	if (!bridge) {
+		pr_err("Invalid params\n");
+		return 0;
+	} else {
+		SDE_ATRACE_BEGIN("panel_disp_param_get");
+		c_bridge = to_dsi_bridge(bridge);
+		if(c_bridge == NULL)
+			return 0;
+		display = c_bridge->display;
+		if(display == NULL)
+			return 0;
+		panel = display->panel;
+		if (panel) {
+			ret = strlen(panel->panel_read_data);
+			ret = ret > 255 ? 255 : ret;
+			if (ret > 0)
+				memcpy(buf, panel->panel_read_data, ret);
+		}
+		SDE_ATRACE_END("panel_disp_param_get");
+	}
+	return ret;
+}
+
 static int dsi_bridge_get_panel_info(struct drm_bridge *bridge, char *buf)
 {
 	int rc = 0;
@@ -672,6 +702,7 @@ static const struct drm_bridge_funcs dsi_bridge_ops = {
 	.post_disable = dsi_bridge_post_disable,
 	.mode_set     = dsi_bridge_mode_set,
 	.disp_param_set = dsi_bridge_disp_param_set,
+	.disp_param_get = dsi_bridge_disp_param_get,
 	.disp_get_panel_info = dsi_bridge_get_panel_info,
 };
 

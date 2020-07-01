@@ -36,6 +36,7 @@
 #define DSI_CMD_PPS_SIZE 135
 
 #define DSI_MODE_MAX 5
+#define BUF_LEN_MAX    256
 
 enum dsi_panel_rotation {
 	DSI_PANEL_ROTATE_NONE = 0,
@@ -168,6 +169,14 @@ struct drm_panel_esd_config {
 	u32 groups;
 };
 
+struct dsi_read_config {
+	bool enabled;
+	struct dsi_panel_cmd_set read_cmd;
+	u32 cmds_rlen;
+	u32 valid_bits;
+	u8 rbuf[64];
+};
+
 struct dsi_panel {
 	const char *name;
 	const char *type;
@@ -223,6 +232,9 @@ struct dsi_panel {
 
 	int hbm_mode;
 	int cabc_mode;
+
+	u8 panel_read_data[BUF_LEN_MAX];
+	struct dsi_read_config xy_coordinate_cmds;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)
