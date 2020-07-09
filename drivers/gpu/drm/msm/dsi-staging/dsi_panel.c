@@ -3434,20 +3434,11 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 		pr_info("[LCD]%s:%d Dispparam disabled.\n", __func__, __LINE__);
 		panel->dispparam_enabled = false;
 	}
-
-	rc = utils->read_u32_array(utils->data,
-		"qcom,mdss-dsi-panel-xy-coordinate",
-		xy_coordinate, XY_COORDINATE_NUM);
-
-	if (rc) {
-		pr_info("%s:%d, Unable to read panel xy coordinate\n",
-		       __func__, __LINE__);
-		panel->xy_coordinate_cmds.enabled = false;
-	} else {
-		panel->xy_coordinate_cmds.cmds_rlen = xy_coordinate[0];
-		panel->xy_coordinate_cmds.valid_bits = xy_coordinate[1];
-		panel->xy_coordinate_cmds.enabled = true;
-	}
+	xy_coordinate[0] = 0x03;
+	xy_coordinate[1] = 0x03;
+	panel->xy_coordinate_cmds.cmds_rlen = xy_coordinate[0];
+	panel->xy_coordinate_cmds.valid_bits = xy_coordinate[1];
+	panel->xy_coordinate_cmds.enabled = true;
 	pr_info("0x%x 0x%x enabled:%d\n",
 		xy_coordinate[0], xy_coordinate[1], panel->xy_coordinate_cmds.enabled);
 
