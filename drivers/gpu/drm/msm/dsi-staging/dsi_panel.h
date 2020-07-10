@@ -235,6 +235,7 @@ struct dsi_panel {
 
 	u8 panel_read_data[BUF_LEN_MAX];
 	struct dsi_read_config xy_coordinate_cmds;
+	struct dsi_read_config max_luminance_cmds;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)

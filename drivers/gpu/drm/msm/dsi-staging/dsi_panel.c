@@ -3441,6 +3441,11 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 	panel->xy_coordinate_cmds.enabled = true;
 	pr_info("0x%x 0x%x enabled:%d\n",
 		xy_coordinate[0], xy_coordinate[1], panel->xy_coordinate_cmds.enabled);
+	panel->max_luminance_cmds.cmds_rlen = 0x03;
+	panel->max_luminance_cmds.valid_bits = 0x04;
+	panel->max_luminance_cmds.enabled = true;
+
+
 
 	rc = dsi_panel_parse_host_config(panel);
 	if (rc) {
@@ -4497,6 +4502,23 @@ static int panel_disp_param_send_lock(struct dsi_panel *panel, int param)
 			rc = dsi_display_read_panel(panel, &panel->xy_coordinate_cmds);
 			if (rc > 0)
 				handle_dsi_read_data(panel, &panel->xy_coordinate_cmds);
+		}
+		break;
+	case 0xf:
+		pr_info("read max luminance nit value\n");
+		cmd_sets.cmds = panel->cur_mode->priv_info->cmd_sets[DSI_CMD_SET_READ_XY_COORDINATE].cmds;
+		if (panel->cur_mode->priv_info->cmd_sets[DSI_CMD_SET_READ_XY_COORDINATE].count)
+			cmd_sets.count = 1;
+		cmd_sets.state = panel->cur_mode->priv_info->cmd_sets[DSI_CMD_SET_READ_XY_COORDINATE].state;
+		rc = dsi_display_write_panel(panel, &cmd_sets);
+		if (rc) {
+			pr_err("[%s][%s] failed to send cmds, rc=%d\n", __func__, panel->name, rc);
+		} else {
+			panel->max_luminance_cmds.read_cmd = cmd_sets;
+			panel->max_luminance_cmds.read_cmd.cmds = &cmd_sets.cmds[1];
+			rc = dsi_display_read_panel(panel, &panel->max_luminance_cmds);
+			if (rc > 0)
+				handle_dsi_read_data(panel, &panel->max_luminance_cmds);
 		}
 		break;
 	default:
