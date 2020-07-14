@@ -1533,7 +1533,6 @@ static void fuse_writepage_finish(struct fuse_conn *fc, struct fuse_req *req)
 	struct backing_dev_info *bdi = inode_to_bdi(inode);
 	int i;
 
-	rb_erase(&req->writepages_entry, &fi->writepages);
 	for (i = 0; i < req->num_pages; i++) {
 		dec_wb_stat(&bdi->wb, WB_WRITEBACK);
 		dec_node_page_state(req->pages[i], NR_WRITEBACK_TEMP);
@@ -1570,6 +1569,8 @@ __acquires(fc->lock)
 	return;
 
  out_free:
+	fi->writectr--;
+	rb_erase(&req->writepages_entry, &fi->writepages);
 	fuse_writepage_finish(fc, req);
 	spin_unlock(&fc->lock);
 	fuse_writepage_free(fc, req);
@@ -1635,6 +1636,7 @@ static void fuse_writepage_end(struct fuse_conn *fc, struct fuse_req *req)
 
 	mapping_set_error(inode->i_mapping, req->out.h.error);
 	spin_lock(&fc->lock);
+	rb_erase(&req->writepages_entry, &fi->writepages);
 	while (req->misc.write.next) {
 		struct fuse_conn *fc = get_fuse_conn(inode);
 		struct fuse_write_in *inarg = &req->misc.write.in;
