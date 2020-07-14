@@ -1600,7 +1600,8 @@ __acquires(fc->lock)
 	}
 }
 
-static void tree_insert(struct rb_root *root, struct fuse_req *req)
+static struct fuse_req *fuse_insert_writeback(struct rb_root *root,
+					      struct fuse_req *req)
 {
 	pgoff_t idx_from = req->misc.write.in.offset >> PAGE_SHIFT;
 	pgoff_t idx_to = idx_from + req->num_pages - 1;
@@ -1622,11 +1623,17 @@ static void tree_insert(struct rb_root *root, struct fuse_req *req)
 		else if (idx_to < curr_index)
 			p = &(*p)->rb_left;
 		else
-			return (void) WARN_ON(true);
+			return curr;
 	}
 
 	rb_link_node(&req->writepages_entry, parent, p);
 	rb_insert_color(&req->writepages_entry, root);
+	return NULL;
+}
+
+static void tree_insert(struct rb_root *root, struct fuse_req *req)
+{
+	WARN_ON(fuse_insert_writeback(root, req));
 }
 
 static void fuse_writepage_end(struct fuse_conn *fc, struct fuse_req *req)
@@ -1828,49 +1835,38 @@ static void fuse_writepages_send(struct fuse_fill_wb_data *data)
 		end_page_writeback(data->orig_pages[i]);
 }
 
-static bool fuse_writepage_in_flight(struct fuse_req *new_req,
-				     struct page *page)
+/*
+ * Check under fi->lock if the page is under writeback, and insert it onto the
+ * rb_tree if not. Otherwise iterate auxiliary write requests, to see if there's
+ * one already added for a page at this offset.  If there's none, then insert
+ * this new request onto the auxiliary list, otherwise reuse the existing one by
+ * swapping the new temp page with the old one.
+ */
+static bool fuse_writepage_add(struct fuse_req *new_req,
+			       struct page *page)
 {
-	struct fuse_conn *fc = get_fuse_conn(new_req->inode);
 	struct fuse_inode *fi = get_fuse_inode(new_req->inode);
+	struct fuse_conn *fc = get_fuse_conn(new_req->inode);
 	struct fuse_req *tmp;
 	struct fuse_req *old_req;
-	struct rb_node *n;
-	bool found = false;
-	pgoff_t curr_index;
 
-	BUG_ON(new_req->num_pages != 0);
+	WARN_ON(new_req->num_pages != 0);
+	new_req->num_pages = 1;
 
 	spin_lock(&fc->lock);
-	n = fi->writepages.rb_node;
-
-	while (n) {
-		old_req = rb_entry(n, struct fuse_req, writepages_entry);
-		BUG_ON(old_req->inode != new_req->inode);
-		curr_index = old_req->misc.write.in.offset >> PAGE_SHIFT;
-		if (curr_index <= page->index &&
-		    page->index < curr_index + old_req->num_pages) {
-			found = true;
-			break;
-		}
-		if (page->index >= curr_index + old_req->num_pages)
-			n = n->rb_right;
-		else
-			n = n->rb_left;
-	}
-	if (!found) {
-		tree_insert(&fi->writepages, new_req);
-		goto out_unlock;
+	old_req = fuse_insert_writeback(&fi->writepages, new_req);
+	if (!old_req) {
+		spin_unlock(&fc->lock);
+		return true;
 	}
 
-	new_req->num_pages = 1;
-	for (tmp = old_req; tmp != NULL; tmp = tmp->misc.write.next) {
+	for (tmp = old_req->misc.write.next; tmp; tmp = tmp->misc.write.next) {
+		pgoff_t curr_index;
+
 		BUG_ON(tmp->inode != new_req->inode);
 		curr_index = tmp->misc.write.in.offset >> PAGE_SHIFT;
-		if (tmp->num_pages == 1 &&
-		    curr_index == page->index) {
+		if (tmp->num_pages == 1 && curr_index == page->index)
 			old_req = tmp;
-		}
 	}
 
 	if (old_req->num_pages == 1 && test_bit(FR_PENDING, &old_req->flags)) {
@@ -1884,15 +1880,12 @@ static bool fuse_writepage_in_flight(struct fuse_req *new_req,
 		wb_writeout_inc(&bdi->wb);
 		fuse_writepage_free(fc, new_req);
 		fuse_request_free(new_req);
-		goto out;
 	} else {
 		new_req->misc.write.next = old_req->misc.write.next;
 		old_req->misc.write.next = new_req;
 	}
-out_unlock:
-	spin_unlock(&fc->lock);
-out:
-	return found;
+
+	return false;
 }
 
 static int fuse_writepages_fill(struct page *page,
@@ -1964,12 +1957,6 @@ static int fuse_writepages_fill(struct page *page,
 		req->num_pages = 0;
 		req->end = fuse_writepage_end;
 		req->inode = inode;
-
-		spin_lock(&fc->lock);
-		tree_insert(&fi->writepages, req);
-		spin_unlock(&fc->lock);
-
-		data->req = req;
 	}
 	set_page_writeback(page);
 
@@ -1977,25 +1964,25 @@ static int fuse_writepages_fill(struct page *page,
 	req->pages[req->num_pages] = tmp_page;
 	req->page_descs[req->num_pages].offset = 0;
 	req->page_descs[req->num_pages].length = PAGE_SIZE;
+	data->orig_pages[req->num_pages] = page;
 
 	inc_wb_stat(&inode_to_bdi(inode)->wb, WB_WRITEBACK);
 	inc_node_page_state(tmp_page, NR_WRITEBACK_TEMP);
 
 	err = 0;
-	if (is_writeback && fuse_writepage_in_flight(req, page)) {
+	if (data->req) {
+		/*
+		 * Protected by fc->lock against concurrent access by
+		 * fuse_page_is_writeback().
+		 */
+		spin_lock(&fc->lock);
+		req->num_pages++;
+		spin_unlock(&fc->lock);
+	} else if (fuse_writepage_add(req, page)) {
+		data->req = req;
+	} else {
 		end_page_writeback(page);
-		data->req = NULL;
-		goto out_unlock;
 	}
-	data->orig_pages[req->num_pages] = page;
-
-	/*
-	 * Protected by fc->lock against concurrent access by
-	 * fuse_page_is_writeback().
-	 */
-	spin_lock(&fc->lock);
-	req->num_pages++;
-	spin_unlock(&fc->lock);
 
 out_unlock:
 	unlock_page(page);
