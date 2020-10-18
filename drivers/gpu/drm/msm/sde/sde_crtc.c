@@ -4321,10 +4321,17 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 
 	SDE_ATRACE_BEGIN("crtc_commit");
 
-	/* Boost when a new frame is ready to be committed */
-	devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
-	devfreq_boost_kick(DEVFREQ_MSM_LLCCBW);
-	cpu_input_boost_kick();
+	/*
+	 * Boost when a new frame is ready to be committed. Only
+	 * if within 3.2s input timeout.
+	 */
+	if (df_boost_within_input(3250)) {
+		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
+		devfreq_boost_kick(DEVFREQ_MSM_LLCCBW);
+	}
+	if (cpu_input_boost_within_input(3250)) {
+		cpu_input_boost_kick();
+	}
 
 	is_error = _sde_crtc_prepare_for_kickoff_rot(dev, crtc);
 
