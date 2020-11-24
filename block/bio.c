@@ -1061,6 +1061,37 @@ void bio_advance(struct bio *bio, unsigned bytes)
 }
 EXPORT_SYMBOL(bio_advance);
 
+void bio_copy_data_iter(struct bio *dst, struct bvec_iter *dst_iter,
+			struct bio *src, struct bvec_iter *src_iter)
+{
+	struct bio_vec src_bv, dst_bv;
+	void *src_p, *dst_p;
+	unsigned bytes;
+
+	while (src_iter->bi_size && dst_iter->bi_size) {
+		src_bv = bio_iter_iovec(src, *src_iter);
+		dst_bv = bio_iter_iovec(dst, *dst_iter);
+
+		bytes = min(src_bv.bv_len, dst_bv.bv_len);
+
+		src_p = kmap_atomic(src_bv.bv_page);
+		dst_p = kmap_atomic(dst_bv.bv_page);
+
+		memcpy(dst_p + dst_bv.bv_offset,
+		       src_p + src_bv.bv_offset,
+		       bytes);
+
+		kunmap_atomic(dst_p);
+		kunmap_atomic(src_p);
+
+		flush_dcache_page(dst_bv.bv_page);
+
+		bio_advance_iter_single(src, src_iter, bytes);
+		bio_advance_iter_single(dst, dst_iter, bytes);
+	}
+}
+EXPORT_SYMBOL(bio_copy_data_iter);
+
 /**
  * bio_copy_data - copy contents of data buffers from one chain of bios to
  * another
@@ -1453,7 +1484,7 @@ struct bio *bio_map_user_iov(struct request_queue *q,
 
 			if (len <= 0)
 				break;
-			
+
 			if (bytes > len)
 				bytes = len;
 
