@@ -1102,6 +1102,22 @@ static void __do_set_cpus_allowed_tail(struct task_struct *p,
 		set_curr_task(rq, p);
 }
 
+static const struct cpumask *
+adjust_cpumask(struct task_struct *p,
+		     const struct cpumask *orig_mask)
+{
+	/* Force all performance-critical kthreads onto the big cluster */
+	if (p->flags & PF_PERF_CRITICAL)
+		return cpu_perf_mask;
+
+	/* Force all trivial, unbound kthreads onto the little cluster */
+	if (p->flags & PF_KTHREAD && !is_global_init(p) &&
+	    cpumask_equal(orig_mask, cpu_all_mask))
+		return cpu_lp_mask;
+
+	return orig_mask;
+}
+
 void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
 {
 #if defined(CONFIG_PREEMPT_COUNT) && defined(CONFIG_SMP)
@@ -1139,6 +1155,8 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 	if ((p->flags & PF_PERF_CRITICAL) && new_mask != cpu_lp_mask &&
 	    new_mask != cpu_perf_mask)
 		return -EINVAL;
+
+	new_mask = adjust_cpumask(p, new_mask);
 
 	rq = task_rq_lock(p, &rf);
 	update_rq_clock(rq);
