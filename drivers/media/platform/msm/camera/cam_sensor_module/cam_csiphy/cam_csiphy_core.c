@@ -1,6 +1,6 @@
 /* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2020 XiaoMi, Inc.
  * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -966,6 +966,8 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 			&ahb_vote, &axi_vote);
 		if (rc < 0) {
 			CAM_ERR(CAM_CSIPHY, "voting CPAS: %d", rc);
+			if (rc == -EALREADY)
+				cam_cpas_stop(csiphy_dev->cpas_handle);
 			goto release_mutex;
 		}
 
