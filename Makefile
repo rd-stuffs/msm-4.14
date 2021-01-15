@@ -744,6 +744,12 @@ endif
 ifeq ($(cc-name),clang)
 KBUILD_CFLAGS	+= -mcpu=cortex-a55 -mtune=cortex-a55
 endif
+ifdef CONFIG_INLINE_OPTIMIZATION
+KBUILD_CFLAGS	+= -mllvm -inline-threshold=2000
+KBUILD_CFLAGS	+= -mllvm -inlinehint-threshold=3000
+KBUILD_CFLAGS   += -mllvm -unroll-threshold=1200
+KBUILD_LDFLAGS  += --plugin-opt=-import-instr-limit=40
+endif
 endif
 
 ifdef CONFIG_MINIMAL_TRACING_FOR_IORAP
