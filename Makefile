@@ -857,12 +857,6 @@ endif
 # Use make W=1 to enable them (see scripts/Makefile.extrawarn)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 
-ifeq ($(cc-name),clang)
-KBUILD_AFLAGS	+= -march=armv8.2-a+crypto+crc+lse+fp16+dotprod+rcpc
-KBUILD_CFLAGS	+= -march=armv8.2-a+crypto+crc+lse+fp16+dotprod+rcpc
-KBUILD_CFLAGS	+= -mtune=cortex-a76
-endif
-
 ifdef CONFIG_LTO_CLANG
 KBUILD_LDFLAGS += -O3 --lto-O3 --strip-debug
 else
