@@ -117,7 +117,6 @@ static struct cpufreq_driver at32_driver = {
 	.verify		= cpufreq_generic_frequency_table_verify,
 	.target_index	= at32_set_target,
 	.get		= cpufreq_generic_get,
-	.flags		= CPUFREQ_STICKY,
 };
 
 static int __init at32_cpufreq_init(void)
