@@ -2831,7 +2831,11 @@ static bool bitmap_testbit(unsigned long *map, unsigned long bit)
 static void inc_prioritized_task_count(struct rq *rq, struct task_struct *p)
 {
 	bool bitset;
+#ifdef CONFIG_SCHED_TUNE
 	int boosted = schedtune_task_boost(p) > 0;
+#elif  CONFIG_UCLAMP_TASK
+	int boosted = uclamp_boosted(p) > 0;
+#endif
 
 	if (is_min_capacity_cpu(cpu_of(rq)))
 		return;
@@ -5468,9 +5472,13 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
 	int task_new = !(flags & ENQUEUE_WAKEUP);
-	bool prefer_idle = sched_feat(EAS_PREFER_IDLE) ?
-				(schedtune_prefer_idle(p) > 0) : 0;
 	int idle_h_nr_running = idle_policy(p->policy);
+	bool prefer_idle = sched_feat(EAS_PREFER_IDLE) ?
+#ifdef CONFIG_SCHED_TUNE
+				(schedtune_prefer_idle(p) > 0) : 0;
+#elif  CONFIG_UCLAMP_TASK
+				(uclamp_latency_sensitive(p) > 0) : 0;
+#endif
 
 #ifdef CONFIG_SCHED_WALT
 	p->misfit = !task_fits_max(p, rq->cpu);
@@ -6035,7 +6043,11 @@ cpu_is_in_target_set(struct task_struct *p, int cpu)
 	struct root_domain *rd = cpu_rq(cpu)->rd;
 	int first_cpu, next_usable_cpu;
 
+#ifdef CONFIG_SCHED_TUNE
 	if (schedtune_task_boost(p) && p->prio <= DEFAULT_PRIO) {
+#elif  CONFIG_UCLAMP_TASK
+	if (uclamp_boosted(p) && p->prio <= DEFAULT_PRIO) {
+#endif
 		first_cpu = rd->mid_cap_orig_cpu != -1 ? rd->mid_cap_orig_cpu :
 			    rd->max_cap_orig_cpu;
 
@@ -7619,8 +7631,12 @@ static inline bool task_fits_max(struct task_struct *p, int cpu)
 		return true;
 
 	if ((task_boost_policy(p) == SCHED_BOOST_ON_BIG ||
-			schedtune_task_boost(p) > 0) &&
-			is_min_capacity_cpu(cpu))
+#ifdef CONFIG_SCHED_TUNE
+			schedtune_task_boost(p) > 0)
+#elif  CONFIG_UCLAMP_TASK
+			uclamp_boosted(p) > 0)
+#endif
+			&& is_min_capacity_cpu(cpu))
 		return false;
 
 	return task_fits_capacity(p, capacity, cpu);
@@ -8188,7 +8204,11 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	if (target_cpu != -1 && !idle_cpu(target_cpu) &&
 			best_idle_cpu != -1) {
 		curr_tsk = READ_ONCE(cpu_rq(target_cpu)->curr);
+#ifdef CONFIG_SCHED_TUNE
 		if (curr_tsk && schedtune_task_boost_rcu_locked(curr_tsk)) {
+#elif  CONFIG_UCLAMP_TASK
+		if (curr_tsk && uclamp_boosted(curr_tsk)) {
+#endif
 			target_cpu = best_idle_cpu;
 		}
 	}
@@ -8478,7 +8498,11 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 	int placement_boost = task_boost_policy(p);
 	u64 start_t = 0;
 	int next_cpu = -1, backup_cpu = -1;
+#ifdef CONFIG_SCHED_TUNE
 	int boosted = (schedtune_task_boost(p) > 0);
+#elif  CONFIG_UCLAMP_TASK
+	int boosted = (uclamp_boosted(p) > 0);
+#endif
 	bool about_to_idle = (cpu_rq(cpu)->nr_running < 2);
 
 	fbt_env.fastpath = 0;
@@ -8550,8 +8574,11 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		 * all if(prefer_idle) blocks.
 		 */
 		prefer_idle = sched_feat(EAS_PREFER_IDLE) ?
+#ifdef CONFIG_SCHED_TUNE
 				(schedtune_prefer_idle(p) > 0) : 0;
-
+#elif  CONFIG_UCLAMP_TASK
+				(uclamp_latency_sensitive(p) > 0) : 0;
+#endif
 		eenv->max_cpu_count = EAS_CPU_BKP + 1;
 
 		fbt_env.rtg_target = rtg_target;
@@ -8667,7 +8694,12 @@ static inline int wake_energy(struct task_struct *p, int prev_cpu,
 		 * Force prefer-idle tasks into the slow path, this may not happen
 		 * if none of the sd flags matched.
 		 */
-		if (schedtune_prefer_idle(p) > 0 && !sync)
+#ifdef CONFIG_SCHED_TUNE
+		if (schedtune_prefer_idle(p) > 0
+#elif  CONFIG_UCLAMP_TASK
+		if (uclamp_latency_sensitive(p) > 0
+#endif
+				&& !sync)
 			return false;
 	}
 	return true;
@@ -9575,7 +9607,11 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 
 	/* Don't allow boosted tasks to be pulled to small cores */
 	if (env->flags & LBF_IGNORE_STUNE_BOOSTED_TASKS &&
+#ifdef CONFIG_SCHED_TUNE
 		(schedtune_task_boost(p) > 0))
+#elif  CONFIG_UCLAMP_TASK
+		(uclamp_boosted(p) > 0))
+#endif
 		return 0;
 
 	if (task_running(env->src_rq, p)) {
