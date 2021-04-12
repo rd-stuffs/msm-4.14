@@ -5072,7 +5072,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 
 	status = devm_request_irq(device->dev, device->pwrctrl.interrupt_num,
 				  kgsl_irq_handler, IRQF_TRIGGER_HIGH |
-				  IRQF_PERF_AFFINE, device->name, device);
+				  IRQF_PERF_KGSL_AFFINE, device->name, device);
 	if (status) {
 		KGSL_DRV_ERR(device, "request_irq(%d) failed: %d\n",
 			      device->pwrctrl.interrupt_num, status);
@@ -5231,7 +5231,7 @@ static long kgsl_run_one_worker(struct kthread_worker *worker,
 {
 	kthread_init_worker(worker);
 	if (perf_crit)
-		*thread = kthread_run_perf_critical(cpu_perf_mask, kthread_worker_fn, worker, name);
+		*thread = kthread_run_perf_critical(cpu_perf_kgsl_mask, kthread_worker_fn, worker, name);
 	else
 		*thread = kthread_run(kthread_worker_fn, worker, name);
 	if (IS_ERR(*thread)) {
