@@ -754,8 +754,11 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 		data->bus.num = 0;
 
 	pwrscale->devfreq_wq = create_freezable_workqueue("kgsl_devfreq_wq");
-	if (!pwrscale->devfreq_wq)
+	if (!pwrscale->devfreq_wq) {
+		dev_err(device->dev, "Failed to allocate kgsl devfreq workqueue\n");
+		device->pwrscale.enabled = false;
 		return -ENOMEM;
+	}
 
 	devfreq = devfreq_add_device(dev, &pwrscale->gpu_profile.profile,
 			governor, pwrscale->gpu_profile.private_data);
