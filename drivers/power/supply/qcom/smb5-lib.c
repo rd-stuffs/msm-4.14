@@ -8270,7 +8270,6 @@ static void smblib_six_pin_batt_step_chg_work(struct work_struct *work)
 		if (rc < 0) {
 		  pr_err("lct Failed to get batt-type rc=%d\n", rc);
 		}
-		//pr_err("lct longcheer to get batt-type =%s\n", pval.strval);
 		if (strcmp(pval.strval, "m703-atl-6000mah") == 0){
 			for (i=0; i<ARRAY_SIZE(chg->six_pin_step_cfg); ++i){
 				chg->six_pin_step_cfg[i]= chg->six_pin_step_cfg_2[i];
