@@ -81,13 +81,13 @@ void failsafe(struct tas256x_priv  *p_tas256x)
 {
 	int n_result;
 
-	dev_err(p_tas256x->dev, "%s\n", __func__);
+	dev_dbg(p_tas256x->dev, "%s\n", __func__);
 	p_tas256x->mn_err_code |= ERROR_FAILSAFE;
 
 	if (p_tas256x->mnRestart < RESTART_MAX) {
 		p_tas256x->mnRestart++;
 		msleep(100);
-		dev_err(p_tas256x->dev, "I2C COMM error, restart SmartAmp.\n");
+		dev_dbg(p_tas256x->dev, "I2C COMM error, restart SmartAmp.\n");
 		schedule_delayed_work(&p_tas256x->irq_work,
 			msecs_to_jiffies(100));
 		return;
@@ -194,7 +194,7 @@ static int tas256xiv_put(struct snd_kcontrol *kcontrol,
 	int iv_enable = 0, n_result = 0;
 
 	if (codec == NULL) {
-		pr_err("%s:codec is NULL\n", __func__);
+		pr_debug("%s:codec is NULL\n", __func__);
 		return 0;
 	}
 
@@ -204,7 +204,7 @@ static int tas256xiv_put(struct snd_kcontrol *kcontrol,
 	p_tas256x = snd_soc_codec_get_drvdata(codec);
 #endif
 	if (p_tas256x == NULL) {
-		pr_err("%s:p_tas256x is NULL\n", __func__);
+		pr_debug("%s:p_tas256x is NULL\n", __func__);
 		return 0;
 	}
 
@@ -230,7 +230,7 @@ static int tas256xiv_get(struct snd_kcontrol *kcontrol,
 	struct tas256x_priv *p_tas256x = NULL;
 
 	if (codec == NULL) {
-		pr_err("%s:codec is NULL\n", __func__);
+		pr_debug("%s:codec is NULL\n", __func__);
 		return 0;
 	}
 
@@ -240,7 +240,7 @@ static int tas256xiv_get(struct snd_kcontrol *kcontrol,
 	p_tas256x = snd_soc_codec_get_drvdata(codec);
 #endif
 	if (p_tas256x == NULL) {
-		pr_err("%s:p_tas256x is NULL\n", __func__);
+		pr_debug("%s:p_tas256x is NULL\n", __func__);
 		return 0;
 	}
 
@@ -481,7 +481,7 @@ static int tas256x_set_power_state(struct tas256x_priv *p_tas256x,
 		break;
 
 	default:
-		dev_err(p_tas256x->dev, "wrong power state setting %d\n",
+		dev_dbg(p_tas256x->dev, "wrong power state setting %d\n",
 				state);
 	}
 
@@ -789,7 +789,7 @@ static int tas256x_set_fmt(struct tas256x_priv *p_tas256x,
 		asi_cfg_1 = 0x00;
 		break;
 	default:
-		dev_err(p_tas256x->dev, "ASI format master is not found\n");
+		dev_dbg(p_tas256x->dev, "ASI format master is not found\n");
 		ret = -EINVAL;
 	}
 
@@ -803,7 +803,7 @@ static int tas256x_set_fmt(struct tas256x_priv *p_tas256x,
 		asi_cfg_1 = 0; /* Faling */
 		break;
 	default:
-		dev_err(p_tas256x->dev, "ASI format Inverse is not found\n");
+		dev_dbg(p_tas256x->dev, "ASI format Inverse is not found\n");
 		ret = -EINVAL;
 	}
 
@@ -819,7 +819,7 @@ static int tas256x_set_fmt(struct tas256x_priv *p_tas256x,
 		tdm_rx_start_slot = 0;
 		break;
 	default:
-	dev_err(p_tas256x->dev, "DAI Format is not found, fmt=0x%x\n", fmt);
+	dev_dbg(p_tas256x->dev, "DAI Format is not found, fmt=0x%x\n", fmt);
 	ret = -EINVAL;
 		break;
 	}
@@ -1028,7 +1028,7 @@ static int tas256x_process_block(void *pContext, unsigned char* data,
         unsigned short len = SMS_HTONS(data[2], data[3]);
         subblk_offset += 2;
         if (subblk_offset + 4 * len > sublocksize) {
-            dev_err(pTAS256x->dev, "Out of memory %s: %u\n", __func__, __LINE__);
+            dev_dbg(pTAS256x->dev, "Out of memory %s: %u\n", __func__, __LINE__);
 			break;
         } 
         
@@ -1045,11 +1045,11 @@ static int tas256x_process_block(void *pContext, unsigned char* data,
         unsigned short len = SMS_HTONS(data[2], data[3]);
         subblk_offset += 2;
         if (subblk_offset + 4 + len > sublocksize) {
-            dev_err(pTAS256x->dev, "Out of memory %s: %u\n", __func__, __LINE__);
+            dev_dbg(pTAS256x->dev, "Out of memory %s: %u\n", __func__, __LINE__);
 			break;
         }
         if (len % 4) {
-            dev_err(pTAS256x->dev, "Burst len is wrong\n");
+            dev_dbg(pTAS256x->dev, "Burst len is wrong\n");
             break;
         }
 
@@ -1063,7 +1063,7 @@ static int tas256x_process_block(void *pContext, unsigned char* data,
     case TAS256X_CMD_DELAY: {
         unsigned short delay_time = 0;
 		if(subblk_offset + 2 > sublocksize) {
-			dev_err(pTAS256x->dev, "Out of memory %s: %u\n", __func__, __LINE__);
+			dev_dbg(pTAS256x->dev, "Out of memory %s: %u\n", __func__, __LINE__);
 			break;
 		}
 		delay_time = SMS_HTONS(data[2], data[3]);
@@ -1073,7 +1073,7 @@ static int tas256x_process_block(void *pContext, unsigned char* data,
                           break;
     case TAS256X_CMD_FIELD_W:
         if (subblk_offset + 6 > sublocksize) {
-            dev_err(pTAS256x->dev,"Out of memory %s: %u\n", __func__, __LINE__);
+            dev_dbg(pTAS256x->dev,"Out of memory %s: %u\n", __func__, __LINE__);
 			break;
         }
         pTAS256x->update_bits(pTAS256x,chn,
@@ -1096,7 +1096,7 @@ void tas256x_select_cfg_blk(void* pContext, int profile_conf_id, unsigned char b
 	int i = 0, j = 0, k = 0;
 
 	if (profile_conf_id > pTAS256x->ncfgs || profile_conf_id < 0 || NULL == cfg_info) {
-		dev_err(pTAS256x->dev, "ERROR!!!conf_no shoud be in range from 0 to %u\n", 
+		dev_dbg(pTAS256x->dev, "ERROR!!!conf_no shoud be in range from 0 to %u\n", 
 			pTAS256x->ncfgs - 1);
 		goto EXIT;
 	} else {
@@ -1108,7 +1108,7 @@ void tas256x_select_cfg_blk(void* pContext, int profile_conf_id, unsigned char b
 			for (j = 0; j < (int)cfg_info[i]->real_nblocks; j++) {
 				unsigned int length = 0, rc = 0;
 				if (block_type > 5 || block_type < 2) {
-					dev_err(pTAS256x->dev, "ERROR!!!block_type shoud be in range from 2 to 5\n");
+					dev_dbg(pTAS256x->dev, "ERROR!!!block_type shoud be in range from 2 to 5\n");
 					goto EXIT;
 				}
 				if (block_type != cfg_info[i]->blk_data[j]->block_type) continue;
@@ -1121,13 +1121,13 @@ void tas256x_select_cfg_blk(void* pContext, int profile_conf_id, unsigned char b
 						cfg_info[i]->blk_data[j]->dev_idx, cfg_info[i]->blk_data[j]->block_size - length);
 					length += rc;
 					if (cfg_info[i]->blk_data[j]->block_size < length) {
-						dev_err(pTAS256x->dev, "%s:%u:ERROR:%u %u out of memory\n", __func__, __LINE__, 
+						dev_dbg(pTAS256x->dev, "%s:%u:ERROR:%u %u out of memory\n", __func__, __LINE__, 
 							length, cfg_info[i]->blk_data[j]->block_size);
 						break;
 					}
 				}
 				if (length != cfg_info[i]->blk_data[j]->block_size) {
-					dev_err(pTAS256x->dev, "%s:%u:ERROR: %u %u size is not same\n", __func__,
+					dev_dbg(pTAS256x->dev, "%s:%u:ERROR: %u %u size is not same\n", __func__,
 						__LINE__, length, cfg_info[i]->blk_data[j]->block_size);
 				}
 			}
@@ -1144,44 +1144,44 @@ static struct tas256x_config_info* tas256x_add_config(unsigned char* config_data
     int config_offset = 0, i = 0;
     cfg_info = (struct tas256x_config_info*)kzalloc(sizeof(struct tas256x_config_info), GFP_KERNEL);
     if (!cfg_info) {
-        pr_err("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
+        pr_debug("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
         goto EXIT;
     }
     if (config_offset + 4 > (int)config_size) {
-        pr_err("%s:%u:Out of memory\n", __func__, __LINE__);
+        pr_debug("%s:%u:Out of memory\n", __func__, __LINE__);
         goto EXIT;
     }
     cfg_info->nblocks = SMS_HTONL(config_data[config_offset], config_data[config_offset+1], 
         config_data[config_offset+2], config_data[config_offset+3]);
     config_offset +=  4;
-    pr_info("cfg_info->num_blocks = %u\n", cfg_info->nblocks);
+    pr_debug("cfg_info->num_blocks = %u\n", cfg_info->nblocks);
     cfg_info->blk_data = (struct tas256x_block_data**)kzalloc(
 		cfg_info->nblocks*sizeof(struct tas256x_block_data*), 
 		GFP_KERNEL);
     if (!cfg_info->blk_data) {
-        pr_err("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
+        pr_debug("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
         goto EXIT;
     }
     cfg_info->real_nblocks = 0;
     for (i = 0; i < (int)cfg_info->nblocks; i++) {
         if (config_offset + 12 > config_size) {
-            pr_err("%s:%u:Out of memory: i = %d nblocks = %u!\n", 
+            pr_debug("%s:%u:Out of memory: i = %d nblocks = %u!\n", 
                 __func__, __LINE__, i, cfg_info->nblocks);
             break;
         }
         cfg_info->blk_data[i] = (struct tas256x_block_data*)kzalloc(
             sizeof(struct tas256x_block_data), GFP_KERNEL);
         if(!cfg_info->blk_data[i]) {
-            pr_err("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
+            pr_debug("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
             break;
         }
         cfg_info->blk_data[i]->dev_idx = config_data[config_offset];
         config_offset++;
-        pr_info("blk_data(%d).dev_idx = 0x%02x\n", i, 
+        pr_debug("blk_data(%d).dev_idx = 0x%02x\n", i, 
             cfg_info->blk_data[i]->dev_idx);
         cfg_info->blk_data[i]->block_type = config_data[config_offset];
         config_offset++;
-        pr_info("blk_data(%d).block_type = 0x%02x\n", i, 
+        pr_debug("blk_data(%d).block_type = 0x%02x\n", i, 
             cfg_info->blk_data[i]->block_type);
         cfg_info->blk_data[i]->yram_checksum = SMS_HTONS(config_data[config_offset], 
             config_data[config_offset+1]);
@@ -1190,23 +1190,23 @@ static struct tas256x_config_info* tas256x_add_config(unsigned char* config_data
             config_data[config_offset + 1], config_data[config_offset + 2], 
             config_data[config_offset + 3]);
         config_offset += 4;
-        pr_info("blk_data(%d).block_size = %u\n", i,
+        pr_debug("blk_data(%d).block_size = %u\n", i,
             cfg_info->blk_data[i]->block_size);
         cfg_info->blk_data[i]->nSublocks = SMS_HTONL(config_data[config_offset],
             config_data[config_offset + 1], config_data[config_offset + 2],
             config_data[config_offset + 3]);
-        pr_info("blk_data(%d).num_subblocks = %u\n", i, 
+        pr_debug("blk_data(%d).num_subblocks = %u\n", i, 
             cfg_info->blk_data[i]->nSublocks);
         config_offset += 4;
-        pr_info("config_offset = %d\n", config_offset);
+        pr_debug("config_offset = %d\n", config_offset);
         cfg_info->blk_data[i]->regdata = (unsigned char*)kzalloc( 
             cfg_info->blk_data[i]->block_size, GFP_KERNEL);
         if(!cfg_info->blk_data[i]->regdata) {
-            pr_err("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
+            pr_debug("%s:%u:Memory alloc failed!\n", __func__, __LINE__);
             goto EXIT;
         }
         if (config_offset + cfg_info->blk_data[i]->block_size > config_size) {
-            pr_err("%s:%u:Out of memory: i = %d nblocks = %u!\n",
+            pr_debug("%s:%u:Out of memory: i = %d nblocks = %u!\n",
                 __func__, __LINE__, i, cfg_info->nblocks);
             break;
         }
@@ -1338,7 +1338,7 @@ static void tas256x_fw_ready(const struct firmware* pFW, void* pContext)
     pTAS256x->fw_state = TAS256X_DSP_FW_FAIL;
 
     if (unlikely(!pFW)||unlikely(!pFW->data)) {
-        dev_err(pTAS256x->dev,"Failed to read %s, no side-effect on driver running\n", fw_name);
+        dev_dbg(pTAS256x->dev,"Failed to read %s, no side-effect on driver running\n", fw_name);
         return;
     }
 	buf = (unsigned char*)pFW->data;
@@ -1352,7 +1352,7 @@ static void tas256x_fw_ready(const struct firmware* pFW, void* pContext)
     fw_hdr->img_sz = SMS_HTONL(buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]);
     offset += 4;
     if (fw_hdr->img_sz != pFW->size) {
-        dev_err(pTAS256x->dev,"File size not match, %d %zu", pFW->size, fw_hdr->img_sz);
+        dev_dbg(pTAS256x->dev,"File size not match, %d %zu", pFW->size, fw_hdr->img_sz);
         goto EXIT;
     }
 
@@ -1376,7 +1376,7 @@ static void tas256x_fw_ready(const struct firmware* pFW, void* pContext)
     dev_dbg(pTAS256x->dev,"ndev = %u\n", fw_hdr->ndev);
 
     if (offset + TAS256X_DEVICE_SUM > fw_hdr->img_sz) {
-        dev_err(pTAS256x->dev,"%s:%u:Out of Memory!\n", __func__, __LINE__);
+        dev_dbg(pTAS256x->dev,"%s:%u:Out of Memory!\n", __func__, __LINE__);
         goto EXIT;
     }
 
@@ -1397,14 +1397,14 @@ static void tas256x_fw_ready(const struct firmware* pFW, void* pContext)
     dev_dbg(pTAS256x->dev,"img_sz = %u total_config_sz = %u offset = %d\n",
         fw_hdr->img_sz, total_config_sz, offset);
     if (fw_hdr->img_sz - total_config_sz != (unsigned int)offset) {
-        dev_err(pTAS256x->dev,"Bin file error!\n");
+        dev_dbg(pTAS256x->dev,"Bin file error!\n");
         goto EXIT;
     }
     cfg_info = (struct tas256x_config_info**)kzalloc(
     	fw_hdr->nconfig*sizeof(struct tas256x_config_info*),
     	GFP_KERNEL);
     if (!cfg_info) {
-        dev_err(pTAS256x->dev,"%s:%u:Memory alloc failed!\n", __func__, __LINE__);
+        dev_dbg(pTAS256x->dev,"%s:%u:Memory alloc failed!\n", __func__, __LINE__);
         goto EXIT;
     }
     pTAS256x->cfg_info = cfg_info;
@@ -1412,7 +1412,7 @@ static void tas256x_fw_ready(const struct firmware* pFW, void* pContext)
     for (i = 0; i < (int)fw_hdr->nconfig; i++) {
         cfg_info[i] = tas256x_add_config(&buf[offset], fw_hdr->config_size[i]);
         if (!cfg_info[i]) {
-            dev_err(pTAS256x->dev,"%s:%u:Memory alloc failed!\n", __func__, __LINE__);
+            dev_dbg(pTAS256x->dev,"%s:%u:Memory alloc failed!\n", __func__, __LINE__);
             break;
         }
         offset += (int)fw_hdr->config_size[i];
@@ -1471,7 +1471,7 @@ static int tas256x_codec_probe(struct snd_soc_component *codec)
 	ret = snd_soc_add_component_controls(codec, tas256x_controls,
 					 ARRAY_SIZE(tas256x_controls));
 	if (ret < 0) {
-		pr_err("%s: add_codec_controls failed, err %d\n",
+		pr_debug("%s: add_codec_controls failed, err %d\n",
 			__func__, ret);
 		return ret;
 	}
@@ -1517,7 +1517,7 @@ static int tas256x_codec_probe(struct snd_soc_codec *codec)
 	ret = snd_soc_add_codec_controls(codec, tas256x_controls,
 					 ARRAY_SIZE(tas256x_controls));
 	if (ret < 0) {
-		pr_err("%s: add_codec_controls failed, err %d\n",
+		pr_debug("%s: add_codec_controls failed, err %d\n",
 			__func__, ret);
 		return ret;
 	}
