@@ -399,17 +399,7 @@ static int notrace ramoops_pstore_write(struct pstore_record *record)
 		persistent_ram_write(cxt->fprzs[zonenum], record->buf,
 				     record->size);
 		return 0;
-	} else if (record->type == PSTORE_TYPE_PMSG) {
-		pr_warn_ratelimited("PMSG shouldn't call %s\n", __func__);
-		return -EINVAL;
 	}
-
-	if (record->type != PSTORE_TYPE_DMESG)
-		return -EINVAL;
-
-	/* Skip Oopes when configured to do so. */
-	if (record->reason == KMSG_DUMP_OOPS && !cxt->dump_oops)
-		return -EINVAL;
 
 	/*
 	 * Explicitly only take the first part of any new crash.
