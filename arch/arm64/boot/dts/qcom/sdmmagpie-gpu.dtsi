@@ -185,9 +185,9 @@
 				qcom,gpu-pwrlevel@0 {
 					reg = <0>;
 					qcom,gpu-freq = <825000000>;
-					qcom,bus-freq = <11>;
+					qcom,bus-freq = <12>;
 					qcom,bus-min = <10>;
-					qcom,bus-max = <11>;
+					qcom,bus-max = <12>;
 				};
 
 				/* TURBO */
@@ -196,7 +196,7 @@
 					qcom,gpu-freq = <800000000>;
 					qcom,bus-freq = <11>;
 					qcom,bus-min = <10>;
-					qcom,bus-max = <11>;
+					qcom,bus-max = <12>;
 				};
 
 				/* NOM_L1 */
