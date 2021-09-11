@@ -429,6 +429,7 @@
 		95 10
 		99 5>;
 	qcom,qg-fast-chg-config;
+	qcom,cl-disable = <1>;
 };
 
 &pm6150_charger {
