@@ -289,6 +289,7 @@ int load_fw(struct npu_device *npu_dev)
 static void complete_pending_commands(struct npu_host_ctx *host_ctx)
 {
 	struct npu_network *network = NULL;
+	struct npu_kevent kevt;
 	struct npu_network_cmd *cmd;
 	struct npu_misc_cmd *misc_cmd;
 	int i;
@@ -299,10 +300,26 @@ static void complete_pending_commands(struct npu_host_ctx *host_ctx)
 		if (!network->is_valid || !network->fw_error)
 			continue;
 
-		list_for_each_entry(cmd, &network->cmd_list, list) {
-			NPU_INFO("complete network %llx trans_id %d\n",
-				network->id, cmd->trans_id);
-			complete(&cmd->cmd_done);
+		if (network->is_async) {
+			NPU_DBG("async cmd, queue ssr event\n");
+			kevt.evt.type = MSM_NPU_EVENT_TYPE_SSR;
+			kevt.evt.u.ssr.network_hdl =
+				network->network_hdl;
+			if (npu_queue_event(network->client, &kevt))
+				NPU_ERR("queue npu event failed\n");
+
+			while (!list_empty(&network->cmd_list)) {
+				cmd = list_first_entry(&network->cmd_list,
+					struct npu_network_cmd, list);
+				npu_dequeue_network_cmd(network, cmd);
+				npu_free_network_cmd(host_ctx, cmd);
+			}
+		} else {
+			list_for_each_entry(cmd, &network->cmd_list, list) {
+				NPU_INFO("complete network %llx trans_id %d\n",
+					network->id, cmd->trans_id);
+				complete(&cmd->cmd_done);
+			}
 		}
 	}
 
@@ -2732,6 +2749,12 @@ int32_t npu_host_exec_network_v2(struct npu_client *client,
 	if (host_ctx->dev_shuttingdown) {
 		NPU_ERR("device is shutting down\n");
 		ret = -EIO;
+		goto exec_v2_done;
+	}
+
+	if (network->is_async && !async_ioctl) {
+		NPU_ERR("network is in async mode\n");
+		ret = -EINVAL;
 		goto exec_v2_done;
 	}
 
