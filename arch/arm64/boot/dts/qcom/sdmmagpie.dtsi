@@ -458,7 +458,7 @@
 	};
 
 	chosen {
-		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket usbcore.autosuspend=7 kpti=off quiet noirqdebug nosoftlockup mce=ignore_ce mitigations=off";
+		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket usbcore.autosuspend=7 kpti=off quiet noirqdebug nosoftlockup mce=ignore_ce mitigations=off printk.always_kmsg_dump=1";
 		rng-seed = <0x12345678>;
 	};
 
@@ -650,9 +650,11 @@
 			compatible = "ramoops";
 			reg = <0x0 0x9d800000 0x0 0x00400000>;
 
-			record-size = <0x80000>;
+			console-size = <0x200000>;
+			record-size = <0x200000>;
 			pmsg-size = <0x200000>;
-			console-size = <0x100000>;
+			ecc-size = <16>;
+			max-reason = <4>;
 		};
 	};
 };
