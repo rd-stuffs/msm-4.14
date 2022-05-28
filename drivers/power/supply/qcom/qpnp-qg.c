@@ -2243,6 +2243,8 @@ static int qg_psy_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
 		chip->fastcharge_mode_enabled = pval->intval;
  		break;
+	case POWER_SUPPLY_PROP_TYPEC_MODE:
+		return -ENODATA;
 	default:
 		break;
 	}
