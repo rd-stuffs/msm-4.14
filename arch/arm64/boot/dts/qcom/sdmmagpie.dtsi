@@ -458,7 +458,7 @@
 	};
 
 	chosen {
-		bootargs = "rcu_nocbs=0-7 kpti=off noirqdebug";
+		bootargs = "rcu_nocbs=0-7 kpti=off noirqdebug mitigations=off";
 		rng-seed = <0x12345678>;
 	};
 
