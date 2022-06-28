@@ -7,6 +7,9 @@
 */
 
 #include "fuse_i.h"
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+#include "fuse_shortcircuit.h"
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 
 #include <linux/pagemap.h>
 #include <linux/slab.h>
@@ -21,6 +24,41 @@
 
 static const struct file_operations fuse_direct_io_file_operations;
 
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+static int fuse_send_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
+			  int opcode, struct fuse_open_out *outargp,
+			  struct file **lower_file)
+{
+	ssize_t ret;
+	struct fuse_open_in inarg;
+	FUSE_ARGS(args);
+	char *iname = NULL;
+
+	memset(&inarg, 0, sizeof(inarg));
+	inarg.flags = file->f_flags & ~(O_CREAT | O_EXCL | O_NOCTTY);
+	if (!fc->atomic_o_trunc)
+		inarg.flags &= ~O_TRUNC;
+	args.in.h.opcode = opcode;
+	args.in.h.nodeid = nodeid;
+	args.in.numargs = 1;
+	args.in.args[0].size = sizeof(inarg);
+	args.in.args[0].value = &inarg;
+	args.out.numargs = 1;
+	args.out.args[0].size = sizeof(*outargp);
+	args.out.args[0].value = outargp;
+
+	if (opcode == FUSE_OPEN)
+		iname = inode_name(file_inode(file));
+	args.iname = iname;
+
+	ret = fuse_simple_request(fc, &args);
+	if (args.iname)
+		__putname(args.iname);
+	if (args.private_lower_rw_file != NULL)
+		*lower_file = args.private_lower_rw_file;
+	return ret;
+}
+#else
 static int fuse_send_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 			  int opcode, struct fuse_open_out *outargp)
 {
@@ -42,6 +80,7 @@ static int fuse_send_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 
 	return fuse_simple_request(fc, &args);
 }
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 
 struct fuse_file *fuse_file_alloc(struct fuse_conn *fc)
 {
@@ -51,6 +90,9 @@ struct fuse_file *fuse_file_alloc(struct fuse_conn *fc)
 	if (unlikely(!ff))
 		return NULL;
 
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+	ff->rw_lower_file = NULL;
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 	ff->fc = fc;
 	ff->reserved_req = fuse_request_alloc(0);
 	if (unlikely(!ff->reserved_req)) {
@@ -131,7 +173,12 @@ int fuse_do_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 		struct fuse_open_out outarg;
 		int err;
 
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+		err = fuse_send_open(fc, nodeid, file, opcode, &outarg,
+				&(ff->rw_lower_file));
+#else
 		err = fuse_send_open(fc, nodeid, file, opcode, &outarg);
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 		if (!err) {
 			ff->fh = outarg.fh;
 			ff->open_flags = outarg.open_flags;
@@ -260,8 +307,10 @@ void fuse_release_common(struct file *file, bool isdir)
 	struct fuse_req *req = ff->reserved_req;
 	int opcode = isdir ? FUSE_RELEASEDIR : FUSE_RELEASE;
 
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+	fuse_shortcircuit_release(ff);
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 	fuse_passthrough_release(&ff->passthrough);
-
 	fuse_prepare_release(ff, file->f_flags, opcode);
 
 	if (ff->flock) {
@@ -948,9 +997,13 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 		if (err)
 			return err;
 	}
-
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+	if (ff && ff->rw_lower_file)
+		return fuse_shortcircuit_read_iter(iocb, to);
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 	if (ff->passthrough.filp)
 		return fuse_passthrough_read_iter(iocb, to);
+
 	return generic_file_read_iter(iocb, to);
 }
 
@@ -1196,11 +1249,21 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	loff_t endbyte = 0;
 	struct fuse_file *ff = file->private_data;
 
-	if (ff->passthrough.filp)
-		return fuse_passthrough_write_iter(iocb, from);
-
 	if (fuse_is_bad(inode))
 		return -EIO;
+
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+	if (ff && ff->rw_lower_file) {
+		/* Update size (EOF optimization) and mode (SUID clearing) */
+		err = fuse_update_attributes(mapping->host, file);
+		if (err)
+			return err;
+
+		return fuse_shortcircuit_write_iter(iocb, from);
+	}
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
+	if (ff->passthrough.filp)
+		return fuse_passthrough_write_iter(iocb, from);
 
 	if (get_fuse_conn(inode)->writeback_cache) {
 		/* Update size (EOF optimization) and mode (SUID clearing) */
@@ -2165,6 +2228,10 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct fuse_file *ff = file->private_data;
 
+#ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
+	if (ff->rw_lower_file)
+		return fuse_shortcircuit_mmap(file, vma);
+#endif /* CONFIG_FUSE_FS_SHORTCIRCUIT */
 	if (ff->passthrough.filp)
 		return fuse_passthrough_mmap(file, vma);
 
