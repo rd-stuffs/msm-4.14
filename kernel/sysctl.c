@@ -146,6 +146,10 @@ static int ten_thousand = 10000;
 static int six_hundred_forty_kb = 640 * 1024;
 #endif
 
+#ifdef CONFIG_OPLUS_MM_HACKS
+extern int direct_vm_swappiness;
+#endif /* CONFIG_OPLUS_MM_HACKS */
+
 /* this is needed for the proc_doulongvec_minmax of vm_dirty_bytes */
 static unsigned long dirty_bytes_min = 2 * PAGE_SIZE;
 
@@ -1662,6 +1666,17 @@ static struct ctl_table vm_table[] = {
 		.extra1		= &zero,
 		.extra2		= &one_hundred,
 	},
+#ifdef CONFIG_OPLUS_MM_HACKS
+	{
+		.procname	= "direct_swappiness",
+		.data		= &direct_vm_swappiness,
+		.maxlen 	= sizeof(direct_vm_swappiness),
+		.mode		= 0444,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1 	= &zero,
+		.extra2 	= &sixty,
+	},
+#endif /* CONFIG_OPLUS_MM_HACKS */
 	{
 		.procname       = "want_old_faultaround_pte",
 		.data           = &want_old_faultaround_pte,
