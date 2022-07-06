@@ -750,6 +750,10 @@ else
 KBUILD_CFLAGS	+= -mllvm -polly-isl-arg=--no-schedule-serialize-sccs
 endif
 
+KBUILD_CFLAGS += $(POLLY_FLAGS)
+KBUILD_AFLAGS += $(POLLY_FLAGS)
+KBUILD_LDFLAGS += $(POLLY_FLAGS)
+
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
