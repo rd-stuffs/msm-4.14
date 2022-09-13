@@ -322,7 +322,7 @@ static FORCE_INLINE int LZ4_compress_generic(
 				*token = (BYTE)(litLength << ML_BITS);
 
 			/* Copy Literals */
-			LZ4_wildCopy8(op, anchor, op + litLength);
+			LZ4_wildCopy(op, anchor, op + litLength);
 			op += litLength;
 		}
 
@@ -506,6 +506,7 @@ int LZ4_compress_fast(const char *source, char *dest, int inputSize,
 	return LZ4_compress_fast_extState(wrkmem, source, dest, inputSize,
 		maxOutputSize, acceleration);
 }
+EXPORT_SYMBOL(LZ4_compress_fast);
 
 int LZ4_compress_default(const char *source, char *dest, int inputSize,
 	int maxOutputSize, void *wrkmem)
@@ -627,7 +628,7 @@ static int LZ4_compress_destSize_generic(
 				*token = (BYTE)(litLength << ML_BITS);
 
 			/* Copy Literals */
-			LZ4_wildCopy8(op, anchor, op + litLength);
+			LZ4_wildCopy(op, anchor, op + litLength);
 			op += litLength;
 		}
 
@@ -707,7 +708,7 @@ _last_literals:
 		} else {
 			*op++ = (BYTE)(lastRunSize<<ML_BITS);
 		}
-		memcpy(op, anchor, lastRunSize);
+		LZ4_memcpy(op, anchor, lastRunSize);
 		op += lastRunSize;
 	}
 
@@ -761,11 +762,12 @@ int LZ4_compress_destSize(
 	return LZ4_compress_destSize_extState(wrkmem, src, dst, srcSizePtr,
 		targetDstSize);
 }
+EXPORT_SYMBOL(LZ4_compress_destSize);
 
 /*-******************************
  *	Streaming functions
  ********************************/
-FORCE_INLINE void LZ4_resetStream(LZ4_stream_t *LZ4_stream)
+void LZ4_resetStream(LZ4_stream_t *LZ4_stream)
 {
 	memset(LZ4_stream, 0, sizeof(LZ4_stream_t));
 }
@@ -932,6 +934,7 @@ int LZ4_compress_fast_continue(LZ4_stream_t *LZ4_stream, const char *source,
 		return result;
 	}
 }
+EXPORT_SYMBOL(LZ4_compress_fast_continue);
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("LZ4 compressor");
