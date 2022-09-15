@@ -1,4 +1,7 @@
 ccflags-y += -Ofast
+ccflags-y += -mllvm -inline-threshold=15000
+ccflags-y += -mllvm -inlinehint-threshold=10000
+ccflags-y += -O3
 
 obj-$(CONFIG_LZ4_COMPRESS) += lz4_compress.o
 obj-$(CONFIG_LZ4HC_COMPRESS) += lz4hc_compress.o
