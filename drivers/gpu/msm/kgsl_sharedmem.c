@@ -1018,6 +1018,7 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 	unsigned int pcount = 0;
 	size_t len;
 	unsigned int align;
+	bool memwq_flush_done = false;
 
 	static DEFINE_RATELIMIT_STATE(_rs,
 					DEFAULT_RATELIMIT_INTERVAL,
@@ -1093,6 +1094,13 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 		if (page_count <= 0) {
 			if (page_count == -EAGAIN)
 				continue;
+
+			/* if OOM, retry once after flushing mem_workqueue */
+			if (ret == -ENOMEM && !memwq_flush_done) {
+				flush_workqueue(kgsl_driver.mem_workqueue);
+				memwq_flush_done = true;
+				continue;
+			}
 
 			/*
 			 * Update sglen and memdesc size,as requested allocation
