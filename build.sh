@@ -64,7 +64,6 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	rm -rf AnyKernel3
 	echo -e "\nCompleted in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s) !"
 	echo "Zip: $ZIPNAME"
-	[ -x "$(command -v gdrive)" ] && gdrive upload --share "$ZIPNAME"
 else
 	echo -e "\nCompilation failed!"
 	exit 1
