@@ -5,9 +5,7 @@
 
 SECONDS=0 # builtin bash timer
 ZIPNAME="QuicksilveR-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-r450784d"
-GCC_64_DIR="$(pwd)/tc/aarch64-linux-android-4.9"
-GCC_32_DIR="$(pwd)/tc/arm-linux-androideabi-4.9"
+TC_DIR="$(pwd)/tc/clang-r498229"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="vendor/surya-perf_defconfig"
 
@@ -17,6 +15,14 @@ if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
 fi
 
 export PATH="$TC_DIR/bin:$PATH"
+
+if ! [ -d "$TC_DIR" ]; then
+	echo "AOSP clang not found! Cloning to $TC_DIR..."
+	if ! git clone --depth=1 -b 17 https://gitlab.com/ThankYouMario/android_prebuilts_clang-standalone.git "$TC_DIR"; then
+		echo "Cloning failed! Aborting..."
+		exit 1
+	fi
+fi
 
 if [[ $1 = "-r" || $1 = "--regen" ]]; then
 	make O=out ARCH=arm64 $DEFCONFIG savedefconfig
@@ -33,7 +39,7 @@ mkdir -p out
 make O=out ARCH=arm64 $DEFCONFIG
 
 echo -e "\nStarting compilation...\n"
-make -j$(nproc --all) O=out ARCH=arm64 CC=clang LD=ld.lld AS=llvm-as AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=$GCC_64_DIR/bin/aarch64-linux-android- CROSS_COMPILE_ARM32=$GCC_32_DIR/bin/arm-linux-androideabi- CLANG_TRIPLE=aarch64-linux-gnu- Image.gz dtbo.img
+make -j$(nproc --all) O=out ARCH=arm64 CC=clang LD=ld.lld AS=llvm-as AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- Image.gz dtbo.img
 
 kernel="out/arch/arm64/boot/Image.gz"
 dtb="out/arch/arm64/boot/dts/qcom/sdmmagpie.dtb"
