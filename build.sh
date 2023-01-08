@@ -5,10 +5,10 @@
 
 SECONDS=0 # builtin bash timer
 ZIPNAME="QuicksilveR-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$HOME/tc/clang-r450784d"
-GCC_64_DIR="$HOME/tc/aarch64-linux-android-4.9"
-GCC_32_DIR="$HOME/tc/arm-linux-androideabi-4.9"
-AK3_DIR="$HOME/android/AnyKernel3"
+TC_DIR="$(pwd)/tc/clang-r450784d"
+GCC_64_DIR="$(pwd)/tc/aarch64-linux-android-4.9"
+GCC_32_DIR="$(pwd)/tc/arm-linux-androideabi-4.9"
+AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="vendor/surya-perf_defconfig"
 
 if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
