@@ -38,6 +38,13 @@ if [[ $1 = "-r" || $1 = "--regen" ]]; then
 	exit
 fi
 
+if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
+	make O=out ARCH=arm64 $DEFCONFIG
+	cp out/.config arch/arm64/configs/$DEFCONFIG
+	echo -e "\nSuccessfully regenerated full defconfig at $DEFCONFIG"
+	exit
+fi
+
 if [[ $1 = "-c" || $1 = "--clean" ]]; then
 	rm -rf out
 fi
