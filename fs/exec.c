@@ -75,6 +75,7 @@
 int suid_dumpable = 0;
 
 #define PERFD_BIN "/vendor/bin/hw/vendor.qti.hardware.perf2-hal-service"
+#define SERVICEMANAGER_BIN "/system/bin/servicemanager"
 
 static struct task_struct *perfd_tsk;
 bool task_is_perfd(struct task_struct *p)
@@ -90,10 +91,18 @@ bool task_is_perfd(struct task_struct *p)
 	return ret;
 }
 
+static struct task_struct *servicemanager_tsk;
+bool task_is_servicemanager(struct task_struct *p)
+{
+	return p == READ_ONCE(servicemanager_tsk);
+}
+
 void dead_special_task(void)
 {
 	if (unlikely(current == perfd_tsk))
 		WRITE_ONCE(perfd_tsk, NULL);
+	else if (unlikely(current == servicemanager_tsk))
+		WRITE_ONCE(servicemanager_tsk, NULL);
 }
 
 static LIST_HEAD(formats);
@@ -1910,6 +1919,9 @@ static int __do_execve_file(int fd, struct filename *filename,
 	if (is_global_init(current->parent)) {
 		if (unlikely(!strcmp(filename->name, PERFD_BIN))) {
 			WRITE_ONCE(perfd_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, SERVICEMANAGER_BIN))) {
+			WRITE_ONCE(servicemanager_tsk, current);
 		}
 		else if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN))) {
 			zygote32_sig = current->signal;
