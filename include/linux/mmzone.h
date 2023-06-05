@@ -499,6 +499,7 @@ enum zone_watermarks {
 #define min_wmark_pages(z) (z->watermark[WMARK_MIN])
 #define low_wmark_pages(z) (z->watermark[WMARK_LOW])
 #define high_wmark_pages(z) (z->watermark[WMARK_HIGH])
+#define wmark_pages(z, i) (z->watermark[i])
 
 struct per_cpu_pages {
 	int count;		/* number of pages in the list */
