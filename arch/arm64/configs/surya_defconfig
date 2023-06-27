@@ -4113,6 +4113,12 @@ CONFIG_UIO_MSM_SHAREDMEM=y
 # CONFIG_VSERVICES_SUPPORT is not set
 CONFIG_STAGING=y
 # CONFIG_IRDA is not set
+
+#
+# KernelSU
+#
+CONFIG_KSU=y
+# CONFIG_KSU_DEBUG is not set
 # CONFIG_PRISM2_USB is not set
 # CONFIG_COMEDI is not set
 # CONFIG_R8712U is not set
