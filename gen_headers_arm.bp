@@ -228,6 +228,7 @@ gen_headers_out_arm = [
     "linux/fsverity.h",
     "linux/fuse.h",
     "linux/futex.h",
+    "linux/f2fs.h",
     "linux/gameport.h",
     "linux/gen_stats.h",
     "linux/genetlink.h",
