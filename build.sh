@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Compile script for AOSP Kernel
+# Compile script for RDKernel
 # Copyright (C) 2020-2023 Adithya R.
 
 SECONDS=0 # builtin bash timer
-ZIPNAME="kernel-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-silont"
+ZIPNAME="RDKernel-surya-$(date '+%Y%m%d-%H%M').zip"
+TC_DIR="$(pwd)/tc/clang-r450784e"
 AK3_DIR="$(pwd)/AnyKernel3"
 DEFCONFIG="surya_defconfig"
 
@@ -21,8 +21,8 @@ MAKE_PARAMS="O=out ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 \
 export PATH="$TC_DIR/bin:$PATH"
 
 if ! [ -d "$TC_DIR" ]; then
-	echo "SiLonT clang not found! Cloning to $TC_DIR..."
-	if ! git clone --depth=1 --single-branch https://gitlab.com/AnggaR96s/clang-gengkapak.git "$TC_DIR"; then
+	echo "AOSP clang not found! Cloning to $TC_DIR..."
+	if ! git clone --depth=1 -b 14 https://gitlab.com/ThankYouMario/android_prebuilts_clang-standalone "$TC_DIR"; then
 		echo "Cloning failed! Aborting..."
 		exit 1
 	fi
@@ -65,8 +65,8 @@ fi
 echo -e "\nKernel compiled succesfully! Zipping up...\n"
 if [ -d "$AK3_DIR" ]; then
 	cp -r $AK3_DIR AnyKernel3
-	git -C AnyKernel3 checkout master &> /dev/null
-elif ! git clone -q https://github.com/rd-stuffs/AnyKernel3 -b master; then
+	git -C AnyKernel3 checkout RDKernel &> /dev/null
+elif ! git clone -q https://github.com/rd-stuffs/AnyKernel3 -b RDKernel; then
 	echo -e "\nAnyKernel3 repo not found locally and couldn't clone from GitHub! Aborting..."
 	exit 1
 fi
