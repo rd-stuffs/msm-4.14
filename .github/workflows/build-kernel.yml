@@ -1,0 +1,43 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup timezone
+        uses: szenius/set-timezone@v1.2
+        with:
+          timezoneLinux: "America/Sao_Paulo"
+
+      - name: Run build script
+        run: ./build.sh
+
+      - name: Setup build date
+        run: echo "BUILD_DATE=$(date '+%H:%M %d/%m/%Y')" >> $GITHUB_ENV
+
+      - name: Git variables
+        run: |
+          HEAD="$(git rev-parse HEAD)"
+          COMMIT_POINT="$(git log --pretty=format:'%h: %s' -1)"
+          HEAD_COMMIT="https://github.com/rd-stuffs/android_kernel_xiaomi_surya/commit/$HEAD"
+          echo "COMMIT_POINT=${COMMIT_POINT}" >> $GITHUB_ENV
+          echo "HEAD_COMMIT=${HEAD_COMMIT}" >> $GITHUB_ENV
+
+      - name: Upload to Telegram
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          document: RDKernel*.zip
+          message: |
+             Build date: ${{ env.BUILD_DATE }}
+             Latest commit: ${{ env.COMMIT_POINT }}
+             
+             ${{ env.HEAD_COMMIT }}
