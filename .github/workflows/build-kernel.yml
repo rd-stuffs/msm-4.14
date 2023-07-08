@@ -1,0 +1,50 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Setup timezone
+        uses: szenius/set-timezone@master
+        with:
+          timezoneLinux: "America/Sao_Paulo"
+
+      - name: Run build script
+        run: |
+          export KBUILD_BUILD_USER=nobody
+          export KBUILD_BUILD_HOST=android-build
+          source build.sh
+          echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
+
+      - name: Setup build date
+        run: echo "BUILD_DATE=$(date '+%H:%M %d/%m/%Y')" >> $GITHUB_ENV
+
+      - name: Git variables
+        run: |
+          HEAD="$(git rev-parse HEAD)"
+          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
+          echo "HEAD_COMMIT=${HEAD_COMMIT}" >> $GITHUB_ENV
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@main
+        with:
+          name: my-artifact
+          path: ${{ env.ZIPNAME }}
+
+      - name: Upload to Telegram
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          document: ${{ env.ZIPNAME }}
+          message: |
+             ${{ env.BUILD_DATE }}
+             
+             ${{ env.HEAD_COMMIT }}
