@@ -19,10 +19,7 @@
 #define DAMOS_MAX_SCORE		(99)
 
 /* Get a random number in [l, r) */
-static inline unsigned long damon_rand(unsigned long l, unsigned long r)
-{
-	return l + prandom_u32_max(r - l);
-}
+#define damon_rand(l, r) (l + prandom_u32_max(r - l))
 
 /**
  * struct damon_addr_range - Represents an address region of [@start, @end).
