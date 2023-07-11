@@ -450,16 +450,15 @@ out:
 #define damon_mkold_hugetlb_entry NULL
 #endif /* CONFIG_HUGETLB_PAGE */
 
+static const struct mm_walk_ops damon_mkold_ops = {
+	.pmd_entry = damon_mkold_pmd_entry,
+	.hugetlb_entry = damon_mkold_hugetlb_entry,
+};
 
 static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
 {
-	struct mm_walk damon_mkold = {
-		.pmd_entry = damon_mkold_pmd_entry,
-		.hugetlb_entry = damon_mkold_hugetlb_entry,
-		.mm = mm,
-	};
 	mmap_read_lock(mm);
-	walk_page_range(addr, addr + 1, &damon_mkold);
+	walk_page_range(mm, addr, addr + 1, &damon_mkold_ops, NULL);
 	mmap_read_unlock(mm);
 }
 
@@ -586,6 +585,11 @@ out:
 #define damon_young_hugetlb_entry NULL
 #endif /* CONFIG_HUGETLB_PAGE */
 
+static const struct mm_walk_ops damon_young_ops = {
+	.pmd_entry = damon_young_pmd_entry,
+	.hugetlb_entry = damon_young_hugetlb_entry,
+};
+
 static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
 		unsigned long *page_sz)
 {
@@ -594,15 +598,8 @@ static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
 		.young = false,
 	};
 
-	struct mm_walk damon_young = {
-		.pmd_entry = damon_young_pmd_entry,
-		.hugetlb_entry = damon_young_hugetlb_entry,
-		.mm = mm,
-		.private = &arg,
-	};
-
 	mmap_read_lock(mm);
-	walk_page_range(addr, addr + 1, &damon_young);
+	walk_page_range(mm, addr, addr + 1, &damon_young_ops, &arg);
 	mmap_read_unlock(mm);
 	return arg.young;
 }
