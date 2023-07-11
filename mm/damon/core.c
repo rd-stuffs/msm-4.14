@@ -12,7 +12,6 @@
 #include <linux/kthread.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/sched/task.h>
 #include <linux/string.h>
 
 #define CREATE_TRACE_POINTS

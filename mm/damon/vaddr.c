@@ -12,7 +12,7 @@
 #include <linux/hugetlb.h>
 #include <linux/mmu_notifier.h>
 #include <linux/page_idle.h>
-#include <linux/sched/task.h>
+#include <linux/pagewalk.h>
 #include <linux/sched/mm.h>
 
 #include "prmtv-common.h"
@@ -179,9 +179,9 @@ static int damon_va_three_regions(struct damon_target *t,
 	if (!mm)
 		return -EINVAL;
 
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 	rc = __damon_va_three_regions(mm->mmap, regions);
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 
 	mmput(mm);
 	return rc;
@@ -458,9 +458,9 @@ static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
 		.hugetlb_entry = damon_mkold_hugetlb_entry,
 		.mm = mm,
 	};
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 	walk_page_range(addr, addr + 1, &damon_mkold);
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 }
 
 /*
@@ -601,9 +601,9 @@ static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
 		.private = &arg,
 	};
 
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 	walk_page_range(addr, addr + 1, &damon_young);
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 	return arg.young;
 }
 
