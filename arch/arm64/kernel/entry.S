@@ -149,18 +149,19 @@
 	// to save/restore them if required.
 	.macro	apply_ssbd, state, targ, tmp1, tmp2
 #ifdef CONFIG_ARM64_SSBD
-alternative_cb	arm64_enable_wa2_handling
+    alternative_cb	arm64_enable_wa2_handling
 	b	\targ
-alternative_cb_end
+    alternative_cb_end
 	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
 	cbz	\tmp2, \targ
 	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
 	tbnz	\tmp2, #TIF_SSBD, \targ
 	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
 	mov	w1, #\state
-alternative_cb	arm64_update_smccc_conduit
+	alternative_cb	arm64_update_smccc_conduit
 	nop					// Patched to SMC/HVC #0
-alternative_cb_end
+	alternative_cb_end
+	smc	#0
 #endif
 	.endm
 
