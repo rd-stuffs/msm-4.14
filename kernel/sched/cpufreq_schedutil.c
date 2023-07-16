@@ -271,6 +271,24 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	return l_freq;
 }
 
+/*
+ * DVFS decision are made at discrete points. If CPU stays busy, the util will
+ * continue to grow, which means it could need to run at a higher frequency
+ * before the next decision point was reached. IOW, we can't follow the util as
+ * it grows immediately, but there's a delay before we issue a request to go to
+ * higher frequency. The headroom caters for this delay so the system continues
+ * to run at adequate performance point.
+ *
+ * This function provides enough headroom to provide adequate performance
+ * assuming the CPU continues to be busy.
+ *
+ * At the moment it is a constant multiplication with 1.25.
+ */
+static inline unsigned long sugov_apply_dvfs_headroom(unsigned long util)
+{
+	return util + (util >> 2);
+}
+
 static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 			   u64 time)
 {
@@ -291,7 +309,7 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 			delta = 0;
 		rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
 		rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
-		*util = min(map_util_perf(*util) + rt, max_cap);
+		*util = min(sugov_apply_dvfs_headroom(*util + rt), max_cap);
 	}
 }
 
