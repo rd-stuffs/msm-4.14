@@ -38,9 +38,7 @@
 #include "../lct_tp_grip_area.h"
 #include "../lct_tp_work.h"
 #include "../lct_tp_palm.h"
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
-#include "../xiaomi/xiaomi_touch.h"
-#endif
+
 #define NVT_DEBUG 0
 
 //---GPIO number---
@@ -134,14 +132,6 @@ typedef struct touchscreen_usb_plugin_data {
 #define TP_VENDOR_HUAXING   0x01
 #define TP_VENDOR_TIANMA    0x02
 
-/* 2019.12.16 longcheer taocheng add (xiaomi game mode) start */
-#define NVT_REG_MONITOR_MODE                0x7000
-#define NVT_REG_THDIFF                      0x7100
-#define NVT_REG_SENSIVITY                   0x7200
-#define NVT_REG_EDGE_FILTER_LEVEL           0xBA00
-#define NVT_REG_EDGE_FILTER_ORIENTATION     0xBC00
-/* 2019.12.16 longcheer taocheng add (xiaomi game mode) end */
-
 //new qcom platform use
 #define _MSM_DRM_NOTIFY_H_
 
@@ -199,17 +189,9 @@ struct nvt_ts_data {
 	struct regulator *pwr_lab; /* VSP +5V */
 	struct regulator *pwr_ibb; /* VSN -5V */
 #endif
-
-/*2019.12.16 longcheer taocheng add (xiaomi game mode) start*/
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
-	u8 palm_sensor_switch;
-	bool palm_sensor_changed;
-	bool gamemode_enabled;
-#endif
 	struct mutex reg_lock;
 	struct device *nvt_touch_dev;
 	struct class *nvt_tp_class;
-/*2019.12.16 longcheer taocheng add (xiaomi game mode) end*/
 };
 
 #if NVT_TOUCH_PROC
@@ -277,7 +259,6 @@ void nvt_sw_reset_idle(void);
 void nvt_boot_ready(void);
 void nvt_bld_crc_enable(void);
 void nvt_fw_crc_enable(void);
-void lyb_apply_changes(void);
 int32_t nvt_update_firmware(char *firmware_name);
 int32_t nvt_check_fw_reset_state(RST_COMPLETE_STATE check_reset_state);
 int32_t nvt_get_fw_info(void);
