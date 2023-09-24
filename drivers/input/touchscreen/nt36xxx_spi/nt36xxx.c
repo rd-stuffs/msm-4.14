@@ -65,15 +65,6 @@ extern int32_t nvt_mp_proc_init(void);
 extern void nvt_mp_proc_deinit(void);
 #endif
 
-/*2019.12.06 longcheer taocheng add charger mode begin*/
-/*function description*/
-#if NVT_USB_PLUGIN
-static void nvt_ts_usb_plugin_work_func(struct work_struct *work);
-DECLARE_WORK(nvt_usb_plugin_work, nvt_ts_usb_plugin_work_func);
-extern touchscreen_usb_plugin_data_t g_touchscreen_usb_pulgin;
-#endif
-/*2019.12.06 longcheer taocheng add charger mode end*/
-
 struct nvt_ts_data *ts;
 //static struct device *spi_geni_master_dev;
 
@@ -131,8 +122,6 @@ const uint16_t gesture_key_array[] = {
 #endif
 
 static uint8_t bTouchIsAwake;
-static uint8_t open_pocket_fail;
-static uint8_t close_pocket_fail;
 
 #if WAKEUP_GESTURE
 #define WAKEUP_OFF 4
@@ -174,55 +163,6 @@ int nvt_ts_recovery_callback(void)
 EXPORT_SYMBOL(nvt_ts_recovery_callback);
 
 #endif
-/*2019.12.6 longcheer taocheng add charger mode begin*/
-/*function description*/
-#if NVT_USB_PLUGIN
-void nvt_ts_usb_event_callback(void)
-{
-	schedule_work(&nvt_usb_plugin_work);
-}
-
-static void nvt_ts_usb_plugin_work_func(struct work_struct *work)
-{
-	uint8_t buf[8] = {0};
-	int32_t ret = 0;
-
-	if (!bTouchIsAwake) {
-		NVT_ERR("tp is suspended, can not to set\n");
-		return;
-	}
-
-	NVT_LOG("++\n");
-	mutex_lock(&ts->lock);
-	NVT_LOG("usb_plugged_in = %d\n", g_touchscreen_usb_pulgin.usb_plugged_in);
-
-	msleep(35);
-
-	//---set xdata index to EVENT BUF ADDR---
-	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
-	if (ret < 0) {
-		NVT_ERR("Set event buffer index fail!\n");
-		goto exit;
-	}
-
-	buf[0] = EVENT_MAP_HOST_CMD;
-	if (g_touchscreen_usb_pulgin.usb_plugged_in)
-		buf[1] = 0x53;// power plug ac on
-	else
-		buf[1] = 0x51;// power plug off
-
-	ret = CTP_SPI_WRITE(ts->client, buf, 2);
-	if (ret < 0) {
-		NVT_ERR("Write pwr plug switch command fail!\n");
-		goto exit;
-	}
-
-exit:
-	mutex_unlock(&ts->lock);
-	NVT_LOG("--\n");
-}
-#endif
-/*2019.12.6 longcheer taocheng add charger mode end*/
 
 /*******************************************************
 Description:
@@ -756,16 +696,13 @@ info_retry:
 	switch (ts->touch_vendor_id) {
 	case TP_VENDOR_HUAXING:
 		snprintf(tp_info_buf, sizeof(tp_info_buf), "[Vendor]huaxing,[FW]0x%02x,[IC]nt36672c\n", ts->fw_ver);
-		update_lct_tp_info(tp_info_buf, NULL);
 		break;
 	case TP_VENDOR_TIANMA:
 		snprintf(tp_info_buf, sizeof(tp_info_buf), "[Vendor]tianma,[FW]0x%02x,[IC]nt36672c\n", ts->fw_ver);
-		update_lct_tp_info(tp_info_buf, NULL);
 		break;
 	}
 #else
 	snprintf(tp_info_buf, PAGE_SIZE, "[Vendor]unknown,[FW]0x%02x,[IC]nt36672c\n", ts->fw_ver);
-	update_lct_tp_info(tp_info_buf, NULL);
 #endif
 
 	//---Get Novatek PID---
@@ -1272,47 +1209,6 @@ static uint8_t nvt_wdt_fw_recovery(uint8_t *point_data)
 }
 #endif	/* #if NVT_TOUCH_WDT_RECOVERY */
 
-#if LCT_TP_PALM_EN
-/*2020.228 longcheer taocheng add for pocket mode start*/
-#define FUNCPAGE_PALM 4
-#define PACKET_PALM_ON 3
-#define PACKET_PALM_OFF 4
-int32_t nvt_check_palm(uint8_t input_id, uint8_t *data)
-{
-	int32_t ret = 0;
-	uint8_t func_type = data[2];
-	uint8_t palm_state = data[3];
-	uint8_t keycode = 0;
-
-	if (get_lct_tp_palm_status()) {
-		if ((input_id == DATA_PROTOCOL) && (func_type == FUNCPAGE_PALM)) {
-			ret = palm_state;
-			if (palm_state == PACKET_PALM_ON) {
-				NVT_LOG("get packet palm on event.\n");
-				keycode = gesture_key_array[13];
-			} else if (palm_state == PACKET_PALM_OFF) {
-				NVT_LOG("get packet palm off event.\n");
-			} else {
-				NVT_ERR("invalid palm state %d!\n", palm_state);
-				ret = -1;
-			}
-		} else {
-			ret = 0;
-		}
-		if (keycode > 0) {
-			NVT_LOG("powerkey.\n");
-			input_report_key(ts->input_dev, keycode, 1);
-			input_sync(ts->input_dev);
-			input_report_key(ts->input_dev, keycode, 0);
-			input_sync(ts->input_dev);
-			set_lct_tp_palm_status(false);
-		}
-	}
-	return ret;
-}
-/*2020.2.28 longcheer taocheng add for pocket mode end*/
-#endif
-
 #define POINT_DATA_LEN 65
 /*******************************************************
 Description:
@@ -1385,11 +1281,6 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	input_id = (uint8_t)(point_data[1] >> 3);
-#if LCT_TP_PALM_EN
-	if (nvt_check_palm(input_id, point_data)) {
-		goto XFER_ERROR;
-	}
-#endif
 #if WAKEUP_GESTURE
 	if (bTouchIsAwake == 0) {
 		//input_id = (uint8_t)(point_data[1] >> 3);
@@ -1471,12 +1362,6 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		input_mt_sync(ts->input_dev);
 	}
 #endif /* MT_PROTOCOL_B */
-
-#if LCT_TP_PALM_EN
-	//nvt_check_palm(input_id, point_data);
-	//mutex_unlock(&ts->lock);
-	//return IRQ_HANDLED;
-#endif
 
 #if TOUCH_KEY_NUM > 0
 	if (point_data[61] == 0xF8) {
@@ -1707,215 +1592,6 @@ disable_vdd_regulator:
 		regulator_disable(ts->pwr_vdd);
 
 exit:
-	return ret;
-}
-#endif
-
-#if LCT_TP_WORK_EN
-static void nvt_ts_release_all_finger(void)
-{
-	struct input_dev *input_dev = ts->input_dev;
-#if MT_PROTOCOL_B
-	u32 finger_count = 0;
-	u32 max_touches = ts->max_touch_num;
-#endif
-
-	mutex_lock(&ts->lock);
-#if MT_PROTOCOL_B
-	for (finger_count = 0; finger_count < max_touches; finger_count++) {
-		input_mt_slot(input_dev, finger_count);
-		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
-	}
-#else
-	input_mt_sync(input_dev);
-#endif
-	input_report_key(input_dev, BTN_TOUCH, 0);
-	input_sync(input_dev);
-	mutex_unlock(&ts->lock);
-	NVT_LOG("release all finger\n");
-}
-
-int lct_nvt_tp_work_callback(bool en)
-{
-	nvt_irq_enable(en);
-	if (!en)
-		nvt_ts_release_all_finger();
-	set_lct_tp_work_status(en);
-	NVT_LOG("%s Touchpad\n", en?"Enable":"Disable");
-	return 0;
-}
-#endif
-/*2020.2.28 longcheer taocheng add for pocket mode start*/
-#if LCT_TP_PALM_EN
-int lct_nvt_tp_palm_callback(bool en)
-{
-	uint8_t buf[8] = {0};
-	int32_t ret = 0;
-
-	if (en) {
-		msleep(30);
-		NVT_LOG("sleep 30ms");
-	} else {
-		if (!open_pocket_fail) {
-			msleep(10);
-			NVT_LOG("sleep 10ms");
-		} else {
-			msleep(20);
-			NVT_LOG("sleep 20ms");
-		}
-	}
-
-	if (!bTouchIsAwake) {
-		NVT_ERR("tp is suspended, can not to set!");
-		if (!en) {
-			open_pocket_fail = 1;
-		} else {
-			msleep(450);
-			NVT_LOG("sleep 450ms");
-			NVT_LOG("bTouchIsAwake=%d", bTouchIsAwake);
-			if (!bTouchIsAwake) {
-				close_pocket_fail = 0;
-			} else {
-				close_pocket_fail = 1;
-			}
-		}
-		return ret;
-	}
-	NVT_LOG("init write_buf[8] = {0}");
-	NVT_LOG("en=%d", en);
-	mutex_lock(&ts->lock);
-	msleep(35);
-
-	//---set xdata index to EVENT BUF ADDR---
-	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
-	if (ret < 0) {
-		NVT_ERR("Set event buffer index fail!");
-		goto exit;
-	}
-	buf[0] = EVENT_MAP_HOST_CMD;
-	buf[1] = 0x74;
-	buf[2] = 0x00;
-	if (en) {
-		NVT_LOG("screen is not locked");
-	} else {
-		NVT_LOG("screen is locked");
-		buf[1] = 0x73;
-	}
-	ret = CTP_SPI_WRITE(ts->client, buf, 3);
-	if (ret < 0) {
-		NVT_ERR("Write palm command fail!");
-		goto exit;
-	}
-	if (!en) {
-		open_pocket_fail = 0;
-	} else {
-		close_pocket_fail = 0;
-	}
-	//set_lct_tp_palm_status(en);
-	NVT_LOG("%s PALM", en ? "Disable" : "Enable");
-
-exit:
-	mutex_unlock(&ts->lock);
-	return ret;
-
-}
-#endif
-/*2020.2.28 longcheer taocheng add for pocket mode end*/
-
-#if LCT_TP_GRIP_AREA_EN
-static int lct_tp_get_screen_angle_callback(void)
-{
-	uint8_t tmp[8] = {0};
-	int32_t ret = -EIO;
-	uint8_t edge_reject_switch;
-
-	if (!bTouchIsAwake) {
-		NVT_ERR("tp is suspended\n");
-		return ret;
-	}
-
-	NVT_LOG("++\n");
-
-	mutex_lock(&ts->lock);
-
-	msleep(35);
-
-	//--set xdata index to EVENT_BUF_ADDR ---
-	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
-	if (ret < 0) {
-		NVT_ERR("Set event buffer index fail!\n");
-		goto out;
-	}
-
-	tmp[0] = 0x5C;
-	tmp[1] = 0x00;
-	ret = CTP_SPI_READ(ts->client, tmp, 2);
-	if (ret < 0) {
-		NVT_ERR("Read edge reject switch status fail!\n");
-		goto out;
-	}
-
-	edge_reject_switch = ((tmp[1] >> 5) & 0x03);
-	switch (edge_reject_switch) {
-	case 1:
-		ret = 0;
-		break;
-	case 2:
-		ret = 270;
-		break;
-	case 3:
-		ret = 90;
-		break;
-	default:
-		break;
-	}
-	NVT_LOG("edge_reject_switch = %d, angle = %d\n", edge_reject_switch, ret);
-
-out:
-	mutex_unlock(&ts->lock);
-	NVT_LOG("--\n");
-	return ret;
-}
-
-static int lct_tp_set_screen_angle_callback(int angle)
-{
-	uint8_t tmp[3];
-	int ret = -EIO;
-
-	if (!bTouchIsAwake) {
-		NVT_ERR("tp is suspended\n");
-		return ret;
-	}
-
-	NVT_LOG("++\n");
-
-	mutex_lock(&ts->lock);
-
-	//--set xdata index to EVENT_BUF_ADDR ---
-	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
-	if (ret < 0) {
-		NVT_ERR("Set event buffer index fail!\n");
-		goto out;
-	}
-
-	tmp[0] = EVENT_MAP_HOST_CMD;
-	if (angle == 90) {
-		tmp[1] = 0xBC;
-	} else if (angle == 270) {
-		tmp[1] = 0xBB;
-	} else {
-		tmp[1] = 0xBA;
-	}
-	ret = CTP_SPI_WRITE(ts->client, tmp, 2);
-	if (ret < 0) {
-		NVT_LOG("i2c read error!\n");
-		goto out;
-	}
-	ret = 0;
-
-out:
-	mutex_unlock(&ts->lock);
-	NVT_LOG("--\n");
 	return ret;
 }
 #endif
@@ -2182,55 +1858,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 #endif
 
-	//create longcheer procfs node
-	ret = init_lct_tp_info("[Vendor]unknown,[FW]unknown,[IC]unknown\n", NULL);
-	if (ret < 0) {
-		NVT_ERR("init_lct_tp_info Failed!\n");
-		goto err_init_lct_tp_info_failed;
-	} else {
-		NVT_LOG("init_lct_tp_info Succeeded!\n");
-	}
-
-#if WAKEUP_GESTURE
-	ret = init_lct_tp_gesture(lct_nvt_tp_gesture_callback);
-	if (ret < 0) {
-		NVT_ERR("init_lct_tp_gesture Failed!\n");
-		goto err_init_lct_tp_gesture_failed;
-	} else {
-		NVT_LOG("init_lct_tp_gesture Succeeded!\n");
-	}
-#endif
-
-#if LCT_TP_GRIP_AREA_EN
-	ret = init_lct_tp_grip_area(lct_tp_set_screen_angle_callback, lct_tp_get_screen_angle_callback);
-	if (ret < 0) {
-		NVT_ERR("init_lct_tp_grip_area Failed!\n");
-		goto err_init_lct_tp_grip_area_failed;
-	} else {
-		NVT_LOG("init_lct_tp_grip_area Succeeded!\n");
-	}
-#endif
-
-#if LCT_TP_WORK_EN
-	ret = init_lct_tp_work(lct_nvt_tp_work_callback);
-	if (ret < 0) {
-		NVT_ERR("init_lct_tp_work Failed!\n");
-		goto err_init_lct_tp_work_failed;
-	} else {
-		NVT_LOG("init_lct_tp_work Succeeded!\n");
-	}
-#endif
-
-#if LCT_TP_PALM_EN
-	ret = init_lct_tp_palm(lct_nvt_tp_palm_callback);
-	if (ret < 0) {
-		NVT_ERR("init_lct_tp_palm Failed!");
-		goto err_init_lct_tp_palm_failed;
-	} else {
-		NVT_LOG("init_lct_tp_palm Succeeded!");
-	}
-#endif
-
 #if defined(CONFIG_FB)
 	ts->workqueue = create_singlethread_workqueue("nvt_ts_workqueue");
 	if (!ts->workqueue) {
@@ -2241,7 +1868,8 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	INIT_WORK(&ts->resume_work, nvt_ts_resume_work);
 #ifdef _MSM_DRM_NOTIFY_H_
 	ts->drm_notif.notifier_call = nvt_drm_notifier_callback;
-	ret = msm_drm_register_client(&ts->drm_notif);
+	ret = drm_register_client(&ts->drm_notif);
+	//ret = msm_drm_register_client(&ts->drm_notif);
 	if (ret) {
 		NVT_ERR("register drm_notifier failed. ret=%d\n", ret);
 		goto err_register_drm_notif_failed;
@@ -2277,11 +1905,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 	pm_runtime_enable(&ts->client->dev);
 
-//2019.12.06 longcheer taocheng add for charger mode
-#if NVT_USB_PLUGIN
-	g_touchscreen_usb_pulgin.event_callback = nvt_ts_usb_event_callback;
-#endif
-
 	set_touchpanel_recovery_callback(nvt_ts_recovery_callback);
 
 #if 0
@@ -2300,8 +1923,10 @@ err_create_nvt_ts_workqueue_failed:
 	if (ts->workqueue)
 		destroy_workqueue(ts->workqueue);
 #ifdef _MSM_DRM_NOTIFY_H_
-	if (msm_drm_unregister_client(&ts->drm_notif))
+	if (drm_unregister_client(&ts->drm_notif))
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
+	//if (msm_drm_unregister_client(&ts->drm_notif))
+	//	NVT_ERR("Error occurred while unregistering drm_notifier.\n");
 err_register_drm_notif_failed:
 #else
 	if (fb_unregister_client(&ts->fb_notif))
@@ -2312,26 +1937,6 @@ err_register_fb_notif_failed:
 	unregister_early_suspend(&ts->early_suspend);
 err_register_early_suspend_failed:
 #endif
-#if LCT_TP_WORK_EN
-err_init_lct_tp_work_failed:
-uninit_lct_tp_work();
-#endif
-
-#if LCT_TP_PALM_EN
-err_init_lct_tp_palm_failed:
-uninit_lct_tp_palm();
-#endif
-
-#if LCT_TP_GRIP_AREA_EN
-err_init_lct_tp_grip_area_failed:
-uninit_lct_tp_grip_area();
-#endif
-#if WAKEUP_GESTURE
-err_init_lct_tp_gesture_failed:
-uninit_lct_tp_gesture();
-#endif
-err_init_lct_tp_info_failed:
-uninit_lct_tp_info();
 #if NVT_TOUCH_MP
 nvt_mp_proc_deinit();
 err_mp_proc_init_failed:
@@ -2416,8 +2021,10 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 	if (ts->workqueue)
 		destroy_workqueue(ts->workqueue);
 #ifdef _MSM_DRM_NOTIFY_H_
-	if (msm_drm_unregister_client(&ts->drm_notif))
+	if (drm_unregister_client(&ts->drm_notif))
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
+	//if (msm_drm_unregister_client(&ts->drm_notif))
+	//	NVT_ERR("Error occurred while unregistering drm_notifier.\n");
 #else
 	if (fb_unregister_client(&ts->fb_notif))
 		NVT_ERR("Error occurred while unregistering fb_notifier.\n");
@@ -2425,23 +2032,6 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	unregister_early_suspend(&ts->early_suspend);
 #endif
-
-	//remove longcheer procfs
-#if LCT_TP_WORK_EN
-	uninit_lct_tp_work();
-#endif
-
-#if LCT_TP_PALM_EN
-	uninit_lct_tp_palm();
-#endif
-
-#if LCT_TP_GRIP_AREA_EN
-	uninit_lct_tp_grip_area();
-#endif
-#if WAKEUP_GESTURE
-	uninit_lct_tp_gesture();
-#endif
-	uninit_lct_tp_info();
 
 #if NVT_TOUCH_MP
 	nvt_mp_proc_deinit();
@@ -2517,8 +2107,10 @@ static void nvt_ts_shutdown(struct spi_device *client)
 	if (ts->workqueue)
 		destroy_workqueue(ts->workqueue);
 #ifdef _MSM_DRM_NOTIFY_H_
-	if (msm_drm_unregister_client(&ts->drm_notif))
+	if (drm_unregister_client(&ts->drm_notif))
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
+	//if (msm_drm_unregister_client(&ts->drm_notif))
+	//	NVT_ERR("Error occurred while unregistering drm_notifier.\n");
 #else
 	if (fb_unregister_client(&ts->fb_notif))
 		NVT_ERR("Error occurred while unregistering fb_notifier.\n");
@@ -2526,15 +2118,6 @@ static void nvt_ts_shutdown(struct spi_device *client)
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	unregister_early_suspend(&ts->early_suspend);
 #endif
-
-	//remove longcheer procfs
-#if LCT_TP_WORK_EN
-	uninit_lct_tp_work();
-#endif
-#if WAKEUP_GESTURE
-	uninit_lct_tp_gesture();
-#endif
-	uninit_lct_tp_info();
 
 #if NVT_TOUCH_MP
 	nvt_mp_proc_deinit();
@@ -2718,13 +2301,6 @@ static int32_t nvt_ts_resume(struct device *dev)
 	NVT_LOG("bTouchIsAwake = 1\n");
 	mutex_unlock(&ts->lock);
 
-#if LCT_TP_PALM_EN
-	if (open_pocket_fail) {
-		NVT_LOG("re-open pocket mode\n");
-		lct_nvt_tp_palm_callback(false);
-	}
-#endif
-
 #if WAKEUP_GESTURE
 	if (ts->delay_gesture) {
 		lct_nvt_tp_gesture_callback(!ts->is_gesture_mode);
@@ -2732,26 +2308,7 @@ static int32_t nvt_ts_resume(struct device *dev)
 	}
 #endif
 
-#if LCT_TP_WORK_EN
-	if (!get_lct_tp_work_status())
-		nvt_irq_enable(false);
-#endif
-
-//2019.12.06 longcheer taocheng add for charger mode
-#if NVT_USB_PLUGIN
-	if (g_touchscreen_usb_pulgin.valid && g_touchscreen_usb_pulgin.usb_plugged_in)
-		g_touchscreen_usb_pulgin.event_callback();
-#endif
-
 	NVT_LOG("end\n");
-
-#if LCT_TP_PALM_EN
-	msleep(100);
-	if (close_pocket_fail) {
-		NVT_LOG("re-close pocket mode\n");
-		lct_nvt_tp_palm_callback(true);
-	}
-#endif
 
 	return 0;
 }
@@ -2799,14 +2356,14 @@ static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long 
 
 	if (evdata->data && ts) {
 		blank = evdata->data;
-		if (event == MSM_DRM_EARLY_EVENT_BLANK) {
-			if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+		if (event == DRM_EARLY_EVENT_BLANK) {
+			if (*blank == DRM_BLANK_POWERDOWN) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
 				cancel_work_sync(&ts->resume_work);
 				nvt_ts_suspend(&ts->client->dev);
 			}
-		} else if (event == MSM_DRM_EVENT_BLANK) {
-			if (*blank == MSM_DRM_BLANK_UNBLANK) {
+		} else if (event == DRM_EVENT_BLANK) {
+			if (*blank == DRM_BLANK_UNBLANK) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
 				//nvt_ts_resume(&ts->client->dev);
 				queue_work(ts->workqueue, &ts->resume_work);

@@ -31,14 +31,6 @@
 
 #include "nt36xxx_mem_map.h"
 
-// include longcheer header
-#include "../lct_tp_info.h"
-#include "../lct_tp_selftest.h"
-#include "../lct_tp_gesture.h"
-#include "../lct_tp_grip_area.h"
-#include "../lct_tp_work.h"
-#include "../lct_tp_palm.h"
-
 #define NVT_DEBUG 0
 
 //---GPIO number---
@@ -88,7 +80,6 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #if WAKEUP_GESTURE
 extern const uint16_t gesture_key_array[];
 #endif
-#define LCT_TP_PALM_EN		1
 #define BOOT_UPDATE_FIRMWARE 1
 #define FIRMWARE_NAME_LEN    256
 #define BOOT_UPDATE_FIRMWARE_NAME         "novatek_ts_fw.bin"
@@ -106,26 +97,6 @@ extern const uint16_t gesture_key_array[];
 
 //enable 'check touch vendor' feature
 #define CHECK_TOUCH_VENDOR
-
-//enable tp work feature
-#define LCT_TP_WORK_EN      1
-
-//enable tp grip area feature
-#define LCT_TP_GRIP_AREA_EN		1
-
-/*2019.12.06 longcheer taocheng add for charger mode begin*/
-/*functions description*/
-//enable tp usb plugin feature
-#define NVT_USB_PLUGIN		1
-
-#if NVT_USB_PLUGIN
-typedef struct touchscreen_usb_plugin_data {
-	bool valid;
-	bool usb_plugged_in;
-	void (*event_callback)(void);
-} touchscreen_usb_plugin_data_t;
-#endif
-/*2019.12.06 longcheer taocheng add charger mode end*/
 
 //---Touch Vendor ID---
 #define TP_VENDOR_UNKNOWN   0x00
