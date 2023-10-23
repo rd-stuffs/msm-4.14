@@ -767,7 +767,7 @@ endif
 KBUILD_CFLAGS	+= $(OPT_FLAGS)
 KBUILD_AFLAGS   += $(OPT_FLAGS)
 ifdef CONFIG_LTO_CLANG
-KBUILD_LDFLAGS += --plugin-opt=O3 --strip-debug -march=armv8.2-a+dotprod -mcpu=cortex-a55+crypto+crc -mtune=cortex-a55
+KBUILD_LDFLAGS += --plugin-opt=O3 --strip-debug -march=armv8.2-a+dotprod -mcpu=cortex-a55+crypto+crc -mtune=cortex-a55 -mllvm -regalloc-enable-advisor=release
 else
 KBUILD_LDFLAGS += $(OPT_FLAGS)
 endif
@@ -833,6 +833,11 @@ KBUILD_CFLAGS += $(call cc-disable-warning, duplicate-decl-specifier)
 KBUILD_CFLAGS += $(call cc-option, -Wno-undefined-optimized)
 KBUILD_CFLAGS += $(call cc-option, -Wno-tautological-constant-out-of-range-compare)
 KBUILD_CFLAGS += $(call cc-option, -Wno-sometimes-uninitialized)
+
+# Enable MLGO for register allocation.
+KBUILD_CFLAGS   += -mllvm -regalloc-enable-advisor=release
+# Enable hot cold split optimization
+KBUILD_CFLAGS   += -mllvm -hot-cold-split=true
 
 # Quiet clang warning: comparison of unsigned expression < 0 is always false
 
