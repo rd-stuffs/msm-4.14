@@ -132,9 +132,6 @@ kernel/configs/android-*.cfg
 Android.bp
 
 # Ignore personal files
-b
-best-caf-kernel.py
+*.zip
 out/
-qcacld
-wg
-regen
+tc/
