@@ -5,9 +5,7 @@
 
 SECONDS=0 # builtin bash timer
 ZIPNAME="QuicksilveR-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-r450784d"
-GCC_64_DIR="$(pwd)/tc/aarch64-linux-android-4.9"
-GCC_32_DIR="$(pwd)/tc/arm-linux-androideabi-4.9"
+TC_DIR="$(pwd)/tc/clang-neutron"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="vendor/surya-perf_defconfig"
 
@@ -17,6 +15,21 @@ if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
 fi
 
 export PATH="$TC_DIR/bin:$PATH"
+
+if ! [ -d "$TC_DIR" ]; then
+	echo "Neutron Clang not found! Downloading to $TC_DIR..."
+	mkdir -p "$TC_DIR" && cd "$TC_DIR"
+	curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
+	bash ./antman -S
+	bash ./antman --patch=glibc
+	cd ../..
+	if ! [ -d "$TC_DIR" ]; then
+		echo "Cloning failed! Aborting..."
+		exit 1
+	fi
+fi
+
+cd "$TC_DIR" && bash ./antman -U && cd ../..
 
 if [[ $1 = "-r" || $1 = "--regen" ]]; then
 	make O=out ARCH=arm64 $DEFCONFIG savedefconfig
@@ -33,7 +46,7 @@ mkdir -p out
 make O=out ARCH=arm64 $DEFCONFIG
 
 echo -e "\nStarting compilation...\n"
-make -j$(nproc --all) O=out ARCH=arm64 CC=clang LD=ld.lld AS=llvm-as AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=$GCC_64_DIR/bin/aarch64-linux-android- CROSS_COMPILE_ARM32=$GCC_32_DIR/bin/arm-linux-androideabi- CLANG_TRIPLE=aarch64-linux-gnu- Image.gz dtbo.img
+make -j$(nproc --all) O=out ARCH=arm64 CC=clang LD=ld.lld AS=llvm-as AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 Image.gz dtbo.img
 
 kernel="out/arch/arm64/boot/Image.gz"
 dtb="out/arch/arm64/boot/dts/qcom/sdmmagpie.dtb"
