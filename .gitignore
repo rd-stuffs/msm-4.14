@@ -132,6 +132,7 @@ kernel/configs/android-*.cfg
 Android.bp
 
 # Ignore personal files
+log.txt
 *.zip
 out/
 tc/
