@@ -91,7 +91,7 @@ int f2fs_init_casefolded_name(const struct inode *dir,
 		fname->cf_name.len = utf8_casefold(sb->s_encoding,
 						   fname->usr_fname,
 						   fname->cf_name.name,
-						   F2FS_NAME_LEN);s
+						   F2FS_NAME_LEN);
 		if ((int)fname->cf_name.len <= 0) {
 			kmem_cache_free(f2fs_cf_name_slab, fname->cf_name.name);
 			fname->cf_name.name = NULL;
