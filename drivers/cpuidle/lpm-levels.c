@@ -492,6 +492,8 @@ static int lpm_cpuidle_select(struct cpuidle_driver *drv,
 	ktime_t delta_next;
 	s64 duration_ns = tick_nohz_get_sleep_length(&delta_next);
 
+	if (duration_ns <= 0)
+		duration_ns = S64_MAX;
 	if (duration_ns <= TICK_NSEC)
 		*stop_tick = false;
 #endif
