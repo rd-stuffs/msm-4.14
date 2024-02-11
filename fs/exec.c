@@ -74,6 +74,28 @@
 
 int suid_dumpable = 0;
 
+#define PERFD_BIN "/vendor/bin/hw/vendor.qti.hardware.perf2-hal-service"
+
+static struct task_struct *perfd_tsk;
+bool task_is_perfd(struct task_struct *p)
+{
+	struct task_struct *tsk;
+	bool ret;
+
+	rcu_read_lock();
+	tsk = READ_ONCE(perfd_tsk);
+	ret = tsk && same_thread_group(p, tsk);
+	rcu_read_unlock();
+
+	return ret;
+}
+
+void dead_special_task(void)
+{
+	if (unlikely(current == perfd_tsk))
+		WRITE_ONCE(perfd_tsk, NULL);
+}
+
 static LIST_HEAD(formats);
 static DEFINE_RWLOCK(binfmt_lock);
 
@@ -1911,6 +1933,9 @@ static int do_execveat_common(int fd, struct filename *filename,
 					   strlen(GRALLOC_BIN_PREFIX)))) {
 			current->flags |= PF_PERF_CRITICAL;
 			set_cpus_allowed_ptr(current, cpu_perf_mask);
+		}
+		else if (unlikely(!strcmp(filename->name, PERFD_BIN))) {
+			WRITE_ONCE(perfd_tsk, current);
 		}
 		else if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN))) {
 			zygote32_sig = current->signal;
