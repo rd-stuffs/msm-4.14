@@ -4465,6 +4465,9 @@ static void smb5_shutdown(struct platform_device *pdev)
 	/* disable all interrupts */
 	smb5_disable_interrupts(chg);
 
+	/* disable VBUS regulator */
+	smblib_masked_write(chg, DCDC_CMD_OTG_REG, OTG_EN_BIT, 0);
+
 	/* configure power role for UFP */
 	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_TYPEC)
 		smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
