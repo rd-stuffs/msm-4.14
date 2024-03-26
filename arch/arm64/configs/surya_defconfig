@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.14.332 Kernel Configuration
+# Linux/arm64 4.14.340 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -1171,7 +1171,6 @@ CONFIG_NET_SCHED=y
 #
 # Queueing/Scheduling
 #
-# CONFIG_NET_SCH_CBQ is not set
 CONFIG_NET_SCH_HTB=y
 # CONFIG_NET_SCH_HFSC is not set
 CONFIG_NET_SCH_PRIO=y
@@ -1182,7 +1181,6 @@ CONFIG_NET_SCH_MULTIQ=y
 # CONFIG_NET_SCH_TEQL is not set
 # CONFIG_NET_SCH_TBF is not set
 # CONFIG_NET_SCH_GRED is not set
-# CONFIG_NET_SCH_DSMARK is not set
 # CONFIG_NET_SCH_NETEM is not set
 # CONFIG_NET_SCH_DRR is not set
 # CONFIG_NET_SCH_MQPRIO is not set
@@ -2785,7 +2783,6 @@ CONFIG_MFD_SPMI_PMIC=y
 # CONFIG_ABX500_CORE is not set
 # CONFIG_MFD_STMPE is not set
 CONFIG_MFD_SYSCON=y
-# CONFIG_MFD_TI_AM335X_TSCADC is not set
 # CONFIG_MFD_LP3943 is not set
 # CONFIG_MFD_LP8788 is not set
 # CONFIG_MFD_TI_LMU is not set
