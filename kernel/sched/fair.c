@@ -3284,6 +3284,28 @@ unsigned long approximate_util_avg(unsigned long util, u64 delta)
 }
 
 /*
+ * Approximate the required amount of runtime in ms required to reach @util.
+ */
+u64 approximate_runtime(unsigned long util)
+{
+	struct sched_avg sa = {};
+	u64 runtime = 0;
+
+	if (unlikely(!util))
+		return runtime;
+
+	while (sa.util_avg < util) {
+		sa.util_sum = decay_load(sa.util_sum, 1);
+		sa.util_sum += (u64)__accumulate_pelt_segments(1, 1024, 0) <<
+				SCHED_CAPACITY_SHIFT;
+		sa.util_avg = sa.util_sum / (LOAD_AVG_MAX - 1024);
+		runtime++;
+	}
+
+	return runtime;
+}
+
+/*
  * When a task is dequeued, its estimated utilization should not be update if
  * its util_avg has not been updated at least once.
  * This flag is used to synchronize util_avg updates with util_est updates.

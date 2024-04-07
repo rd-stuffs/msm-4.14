@@ -528,6 +528,35 @@ unsigned int cpufreq_driver_resolve_freq(struct cpufreq_policy *policy,
 }
 EXPORT_SYMBOL_GPL(cpufreq_driver_resolve_freq);
 
+/*
+ * __resolve_freq - Map a target frequency to a driver-supported one.
+ * @target_freq: target frequency to resolve.
+ * @relation: relation between target_freq and the resolved frequency.
+ *
+ * The target to driver frequency mapping is cached in the policy.
+ *
+ * Return: driver-supported frequency matching target_freq via @relation,
+ * subject to policy (min/max) and driver limitations.
+ */
+unsigned int __resolve_freq(struct cpufreq_policy *policy,
+			    unsigned int target_freq, unsigned int relation)
+{
+	int idx;
+
+	target_freq = clamp_val(target_freq, policy->min, policy->max);
+	policy->cached_target_freq = target_freq;
+
+	idx = cpufreq_frequency_table_target(policy, target_freq, relation);
+	if (idx >= 0)
+		return policy->freq_table[idx].frequency;
+
+	if (cpufreq_driver->resolve_freq)
+		return cpufreq_driver->resolve_freq(policy, target_freq);
+
+	return target_freq;
+}
+EXPORT_SYMBOL_GPL(__resolve_freq);
+
 unsigned int cpufreq_policy_transition_delay_us(struct cpufreq_policy *policy)
 {
 	unsigned int latency;

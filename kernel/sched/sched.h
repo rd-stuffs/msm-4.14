@@ -307,6 +307,7 @@ struct dl_bw {
 extern u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se);
 
 unsigned long approximate_util_avg(unsigned long util, u64 delta);
+u64 approximate_runtime(unsigned long util);
 
 /*
  * Any governor that relies on util signal to drive DVFS, must populate these
