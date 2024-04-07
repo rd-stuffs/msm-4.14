@@ -762,7 +762,7 @@ static u64 __sched_period(unsigned long nr_running)
  *
  * s = p*P[w/rw]
  */
-static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
+u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	u64 slice = __sched_period(cfs_rq->nr_running + !se->on_rq);
 
@@ -783,6 +783,7 @@ static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	}
 	return slice;
 }
+EXPORT_SYMBOL_GPL(sched_slice);
 
 /*
  * We calculate the vruntime slice of a to-be-inserted task.
@@ -3246,6 +3247,40 @@ ___update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	}
 
 	return 1;
+}
+
+/*
+ * Approximate the new util_avg value assuming an entity has continued to run
+ * for @delta us.
+ */
+unsigned long approximate_util_avg(unsigned long util, u64 delta)
+{
+	struct sched_avg sa = {
+		.util_sum = util * (LOAD_AVG_MAX - 1024),
+		.util_avg = util,
+	};
+
+	u32 contrib = (u32)delta;
+	u64 periods;
+
+	if (unlikely(!delta))
+		return util;
+
+	delta += sa.period_contrib;
+	periods = delta / 1024;
+
+	if (periods) {
+		sa.util_sum = decay_load(sa.util_sum, periods);
+		delta %= 1024;
+		contrib = __accumulate_pelt_segments(periods,
+				1024 - sa.period_contrib, delta);
+	}
+
+	sa.period_contrib = delta;
+	sa.util_sum += (u64)contrib << SCHED_CAPACITY_SHIFT;
+	sa.util_avg = sa.util_sum / (LOAD_AVG_MAX - 1024 + sa.period_contrib);
+
+	return sa.util_avg;
 }
 
 /*

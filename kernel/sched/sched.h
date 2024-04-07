@@ -304,6 +304,19 @@ struct dl_bw {
 	u64 bw, total_bw;
 };
 
+extern u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se);
+
+unsigned long approximate_util_avg(unsigned long util, u64 delta);
+
+/*
+ * Any governor that relies on util signal to drive DVFS, must populate these
+ * percpu dvfs_update_delay variables.
+ *
+ * It should describe the rate/delay at which the governor sends DVFS freq
+ * update to the hardware in us.
+ */
+DECLARE_PER_CPU_READ_MOSTLY(u64, dvfs_update_delay);
+
 static inline void __dl_update(struct dl_bw *dl_b, s64 bw);
 
 static inline
