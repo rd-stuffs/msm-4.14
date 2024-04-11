@@ -43,8 +43,7 @@ MODULE_LICENSE("GPL v2");
 
 #define THERMAL_MAX_ACTIVE	16
 
-#define CPU_LIMITS_PARAM_NUM    2
-
+#define CPU_LIMITS_PARAM_NUM	2
 
 static DEFINE_IDA(thermal_tz_ida);
 static DEFINE_IDA(thermal_cdev_ida);
@@ -1673,7 +1672,6 @@ thermal_sconfig_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&switch_mode));
 }
 
-
 static ssize_t
 thermal_sconfig_store(struct device *dev,
 				      struct device_attribute *attr, const char *buf, size_t len)
@@ -1761,10 +1759,7 @@ thermal_board_sensor_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	if (!board_sensor)
-	{
 		board_sensor = "invalid";
-		printk("thermal_board_sensor invalid.\n");
-	}
 
 	return snprintf(buf, PAGE_SIZE, "%s", board_sensor);
 }
@@ -1823,7 +1818,6 @@ static int create_thermal_message_node(void)
 		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_cpu_limits.attr);
 		if (ret < 0)
 			pr_warn("Thermal: create cpu limits node failed\n");
-
 		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_board_sensor.attr);
 		if (ret < 0)
 			pr_warn("Thermal: create board sensor node failed\n");
@@ -1853,7 +1847,7 @@ static void destroy_thermal_message_node(void)
 #ifdef CONFIG_DRM
 static int screen_state_for_thermal_callback(struct notifier_block *nb, unsigned long val, void *data)
 {
-	struct drm_notify_data *evdata = data;
+	struct msm_drm_notifier *evdata = data;
 	unsigned int blank;
 
 	if (val != MSM_DRM_EVENT_BLANK || !evdata || !evdata->data)
@@ -1863,11 +1857,11 @@ static int screen_state_for_thermal_callback(struct notifier_block *nb, unsigned
 	switch (blank) {
 	case MSM_DRM_BLANK_POWERDOWN:
 		sm.screen_state = 0;
-		pr_warn("%s: DRM_BLANK_POWERDOWN\n", __func__);
+		pr_warn("%s: MSM_DRM_BLANK_POWERDOWN\n", __func__);
 		break;
 	case MSM_DRM_BLANK_UNBLANK:
 		sm.screen_state = 1;
-		pr_warn("%s: DRM_BLANK_UNBLANK\n", __func__);
+		pr_warn("%s: MSM_DRM_BLANK_UNBLANK\n", __func__);
 		break;
 	default:
 		break;
@@ -1878,7 +1872,6 @@ static int screen_state_for_thermal_callback(struct notifier_block *nb, unsigned
 	return NOTIFY_OK;
 }
 #endif
-
 
 static int of_parse_thermal_message(void)
 {
@@ -1892,8 +1885,6 @@ static int of_parse_thermal_message(void)
 		return -EINVAL;
 
 	pr_info("%s board sensor: %s\n", board_sensor);
-
-	printk("board sensor: %s\n", board_sensor);
 
 	return 0;
 }
@@ -1932,7 +1923,6 @@ static int __init thermal_init(void)
 	if (result)
 		pr_warn("Thermal: create thermal message node failed, return %d\n",
 			result);
-
 	result = of_parse_thermal_message();
 	if (result)
 		pr_warn("Thermal: Can not parse thermal message node, return %d\n",
