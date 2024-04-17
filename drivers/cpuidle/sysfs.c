@@ -255,25 +255,6 @@ static ssize_t show_state_##_name(struct cpuidle_state *state, \
 	return sprintf(buf, "%u\n", state->_name);\
 }
 
-#define define_store_state_ull_function(_name) \
-static ssize_t store_state_##_name(struct cpuidle_state *state, \
-				   struct cpuidle_state_usage *state_usage, \
-				   const char *buf, size_t size)	\
-{ \
-	unsigned long long value; \
-	int err; \
-	if (!capable(CAP_SYS_ADMIN)) \
-		return -EPERM; \
-	err = kstrtoull(buf, 0, &value); \
-	if (err) \
-		return err; \
-	if (value) \
-		state_usage->_name = 1; \
-	else \
-		state_usage->_name = 0; \
-	return size; \
-}
-
 #define define_show_state_ull_function(_name) \
 static ssize_t show_state_##_name(struct cpuidle_state *state, \
 				  struct cpuidle_state_usage *state_usage, \
@@ -299,8 +280,36 @@ define_show_state_ull_function(usage)
 define_show_state_ull_function(time)
 define_show_state_str_function(name)
 define_show_state_str_function(desc)
-define_show_state_ull_function(disable)
-define_store_state_ull_function(disable)
+
+static ssize_t show_state_disable(struct cpuidle_state *state,
+				  struct cpuidle_state_usage *state_usage,
+				  char *buf)
+{
+	return sprintf(buf, "%llu\n",
+		       state_usage->disable & CPUIDLE_STATE_DISABLED_BY_USER);
+}
+
+static ssize_t store_state_disable(struct cpuidle_state *state,
+				   struct cpuidle_state_usage *state_usage,
+				   const char *buf, size_t size)
+{
+	unsigned int value;
+	int err;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	err = kstrtouint(buf, 0, &value);
+	if (err)
+		return err;
+
+	if (value)
+		state_usage->disable |= CPUIDLE_STATE_DISABLED_BY_USER;
+	else
+		state_usage->disable &= ~CPUIDLE_STATE_DISABLED_BY_USER;
+
+	return size;
+}
 
 define_one_state_ro(name, show_state_name);
 define_one_state_ro(desc, show_state_desc);
@@ -415,6 +424,7 @@ static int cpuidle_add_state_sysfs(struct cpuidle_device *device)
 					   &kdev->kobj, "state%d", i);
 		if (ret) {
 			kobject_put(&kobj->kobj);
+			kfree(kobj);
 			goto error_state;
 		}
 		kobject_uevent(&kobj->kobj, KOBJ_ADD);
@@ -545,6 +555,7 @@ static int cpuidle_add_driver_sysfs(struct cpuidle_device *dev)
 				   &kdev->kobj, "driver");
 	if (ret) {
 		kobject_put(&kdrv->kobj);
+		kfree(kdrv);
 		return ret;
 	}
 
@@ -631,7 +642,6 @@ int cpuidle_add_sysfs(struct cpuidle_device *dev)
 	if (!kdev)
 		return -ENOMEM;
 	kdev->dev = dev;
-	dev->kobj_dev = kdev;
 
 	init_completion(&kdev->kobj_unregister);
 
@@ -639,9 +649,11 @@ int cpuidle_add_sysfs(struct cpuidle_device *dev)
 				   "cpuidle");
 	if (error) {
 		kobject_put(&kdev->kobj);
+		kfree(kdev);
 		return error;
 	}
 
+	dev->kobj_dev = kdev;
 	kobject_uevent(&kdev->kobj, KOBJ_ADD);
 
 	return 0;

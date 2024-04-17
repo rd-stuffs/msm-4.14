@@ -53,7 +53,7 @@ void on_each_cpu_cond(bool (*cond_func)(int cpu, void *info),
 		smp_call_func_t func, void *info, bool wait,
 		gfp_t gfp_flags);
 
-int smp_call_function_single_async(int cpu, call_single_data_t *csd);
+int smp_call_function_single_async(int cpu, struct __call_single_data *csd);
 
 #ifdef CONFIG_SMP
 
@@ -72,6 +72,11 @@ int smp_call_function_single_async(int cpu, call_single_data_t *csd);
  * stops all CPUs but the current one:
  */
 extern void smp_send_stop(void);
+
+/*
+ * sends an IPI event to the specified CPUs:
+ */
+extern void smp_send_ipi(const struct cpumask *cpus);
 
 /*
  * sends a 'reschedule' event to another CPU:
@@ -97,8 +102,8 @@ extern void smp_cpus_done(unsigned int max_cpus);
 /*
  * Call a function on all other processors
  */
-int generic_exec_single(int cpu, call_single_data_t *csd, smp_call_func_t func,
-			void *info);
+int generic_exec_single(int cpu, struct __call_single_data *csd,
+			smp_call_func_t func, void *info);
 int smp_call_function(smp_call_func_t func, void *info, int wait);
 void smp_call_function_many(const struct cpumask *mask,
 			    smp_call_func_t func, void *info, bool wait);

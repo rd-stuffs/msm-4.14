@@ -128,4 +128,6 @@ kernel/configs/android-*.cfg
 
 # kernel builds
 *.zip
+log.txt
 out/
+tc/
