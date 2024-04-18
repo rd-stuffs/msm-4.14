@@ -16,6 +16,9 @@ jobs:
         with:
           timezoneLinux: "America/Sao_Paulo"
 
+      - name: Setup the environment
+        run: sudo apt-get install elfutils libarchive-tools -y
+
       - name: Run build script
         run: |
           source build.sh
