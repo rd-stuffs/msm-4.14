@@ -74,6 +74,13 @@ static inline void init_poll_funcptr(poll_table *pt, poll_queue_proc qproc)
 	pt->_key   = ~0UL; /* all events enabled */
 }
 
+static inline unsigned int vfs_poll(struct file *file, poll_table *pt)
+{
+	if (unlikely(!file->f_op->poll))
+		return DEFAULT_POLLMASK;
+	return file->f_op->poll(file, pt);
+}
+
 struct poll_table_entry {
 	struct file *filp;
 	unsigned long key;
