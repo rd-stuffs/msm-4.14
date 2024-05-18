@@ -2053,10 +2053,10 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 		rc = smblib_get_prop_from_bms(chg,
 				POWER_SUPPLY_PROP_BATTERY_TYPE,val);
 		if (strcmp(val->strval,"m703-atl-6000mah") == 0){
-			val->intval = 6000;
+			val->intval = 6000 * 1000;
 		}
 		else if(strcmp(val->strval,"m703-pm7150b-atl-5160mah") == 0){
-			val->intval = 5160;
+			val->intval = 5160 * 1000;
 		}
 		break;
 	case POWER_SUPPLY_PROP_FORCE_RECHARGE:
