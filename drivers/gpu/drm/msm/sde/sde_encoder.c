@@ -313,7 +313,7 @@ static void _sde_encoder_pm_qos_add_request(struct drm_encoder *drm_enc,
 
 	req = &sde_enc->pm_qos_cpu_req;
 	req->type = PM_QOS_REQ_AFFINE_CORES;
-	req->cpus_affine, cpu_mask;
+	atomic_set(&req->cpus_affine, cpu_mask);
 	pm_qos_add_request(req, PM_QOS_CPU_DMA_LATENCY, cpu_dma_latency);
 
 	SDE_EVT32_VERBOSE(DRMID(drm_enc), cpu_mask, cpu_dma_latency);
