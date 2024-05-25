@@ -98,5 +98,3 @@ obj-$(CONFIG_LDO_WL2866D)     += wl2866d.o
 
 obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
 obj-$(CONFIG_LYB_THERMAL) += lyb_thermal_qcom.o
-
-obj-y				+= lyb_taskmmu.o
