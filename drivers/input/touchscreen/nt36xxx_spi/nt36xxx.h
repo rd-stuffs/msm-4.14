@@ -31,6 +31,11 @@
 
 #include "nt36xxx_mem_map.h"
 
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+// include longcheer header
+#include "../lct_tp_gesture.h"
+#endif
+
 #define NVT_DEBUG 0
 
 //---GPIO number---

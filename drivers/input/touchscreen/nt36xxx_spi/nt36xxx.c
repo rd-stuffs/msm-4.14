@@ -1863,6 +1863,18 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+#if WAKEUP_GESTURE
+	ret = init_lct_tp_gesture(lct_nvt_tp_gesture_callback);
+	if (ret < 0) {
+		NVT_ERR("init_lct_tp_gesture Failed!\n");
+		goto err_init_lct_tp_gesture_failed;
+	} else {
+		NVT_LOG("init_lct_tp_gesture Succeeded!\n");
+	}
+#endif
+#endif
+
 #if defined(CONFIG_FB)
 	ts->workqueue = create_singlethread_workqueue("nvt_ts_workqueue");
 	if (!ts->workqueue) {
@@ -1967,6 +1979,12 @@ err_create_nvt_fwu_wq_failed:
 #if WAKEUP_GESTURE
 	device_init_wakeup(&ts->input_dev->dev, 0);
 #endif
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+#if WAKEUP_GESTURE
+err_init_lct_tp_gesture_failed:
+uninit_lct_tp_gesture();
+#endif
+#endif
 	free_irq(client->irq, ts);
 err_int_request_failed:
 	input_unregister_device(ts->input_dev);
@@ -2046,6 +2064,12 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 		destroy_workqueue(nvt_esd_check_wq);
 		nvt_esd_check_wq = NULL;
 	}
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+#if WAKEUP_GESTURE
+	uninit_lct_tp_gesture();
+#endif
 #endif
 
 #if BOOT_UPDATE_FIRMWARE
@@ -2130,6 +2154,12 @@ static void nvt_ts_shutdown(struct spi_device *client)
 		nvt_esd_check_wq = NULL;
 	}
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+#if WAKEUP_GESTURE
+	uninit_lct_tp_gesture();
+#endif
+#endif
 
 #if BOOT_UPDATE_FIRMWARE
 	if (nvt_fwu_wq) {
