@@ -5,7 +5,7 @@
 
 SECONDS=0 # builtin bash timer
 ZIPNAME="kernel-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-r498229"
+TC_DIR="$(pwd)/tc/clang-neutron"
 AK3_DIR="$(pwd)/AnyKernel3"
 DEFCONFIG="vendor/surya-perf_defconfig"
 
@@ -22,12 +22,15 @@ MAKE_PARAMS="O=out ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 \
 PATH="$TC_DIR/bin:$PATH"
 
 if ! [ -d "$TC_DIR" ]; then
-   echo "AOSP clang not found! Cloning to $TC_DIR..."
-   if ! git clone --depth=1 -b 17 https://gitlab.com/ThankYouMario/android_prebuilts_clang-standalone "$TC_DIR"; then
-      echo "Cloning failed! Aborting..."
-      exit 1
-   fi
+   echo "Neutron Clang not found! Downloading to $TC_DIR..."
+   mkdir -p "$TC_DIR" && cd "$TC_DIR"
+   curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
+   bash ./antman -S
+   bash ./antman --patch=glibc
+   cd ../..
 fi
+
+cd "$TC_DIR" && bash ./antman -U && cd ../..
 
 if [[ $1 = "-r" || $1 = "--regen" ]]; then
    make $MAKE_PARAMS $DEFCONFIG savedefconfig
