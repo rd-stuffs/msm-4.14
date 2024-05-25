@@ -1793,7 +1793,6 @@ static void zram_slot_free_notify(struct block_device *bdev,
 static int zram_ioctl(struct block_device *bdev, fmode_t mode,
 				 unsigned int cmd, unsigned long index)
 {
-	struct zram *zram;
 	int has_sync_io = 1;
 
 	if (cmd != SWP_SYNCHRONOUS_IO) return -EINVAL;

@@ -754,19 +754,14 @@ KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-ast-use-context \
 		   -mllvm -polly-detect-keep-going \
 		   -mllvm -polly-invariant-load-hoisting \
-		   -mllvm -polly-vectorizer=stripmine
-
-ifeq ($(shell test $(CONFIG_CLANG_VERSION) -gt 130000; echo $$?),0)
-KBUILD_CFLAGS	+= -mllvm -polly-loopfusion-greedy=1 \
+		   -mllvm -polly-vectorizer=stripmine \
+		   -mllvm -polly-loopfusion-greedy=1 \
 		   -mllvm -polly-reschedule=1 \
 		   -mllvm -polly-postopts=1 \
 		   -mllvm -polly-num-threads=0 \
 		   -mllvm -polly-omp-backend=LLVM \
 		   -mllvm -polly-scheduling=dynamic \
 		   -mllvm -polly-scheduling-chunksize=1
-else
-KBUILD_CFLAGS	+= -mllvm -polly-isl-arg=--no-schedule-serialize-sccs
-endif
 
 KBUILD_CFLAGS += $(POLLY_FLAGS)
 KBUILD_AFLAGS += $(POLLY_FLAGS)

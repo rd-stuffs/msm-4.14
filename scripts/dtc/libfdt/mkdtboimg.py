@@ -125,7 +125,7 @@ class DtEntry(object):
                 version: Version of DTBO header, compression is only
                          supported from version 1.
         """
-        if version is 0:
+        if version == 0:
             return CompressionFormat.NO_COMPRESSION
         return self.flags & self._COMPRESSION_FORMAT_MASK
 
