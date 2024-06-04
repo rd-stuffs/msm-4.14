@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -15,9 +15,6 @@ jobs:
         uses: szenius/set-timezone@master
         with:
           timezoneLinux: "America/Sao_Paulo"
-
-      - name: Setup the environment
-        run: sudo apt-get install elfutils libarchive-tools -y
 
       - name: Run build script
         run: |
@@ -32,12 +29,6 @@ jobs:
           HEAD="$(git rev-parse HEAD)"
           HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
           echo "HEAD_COMMIT=${HEAD_COMMIT}" >> $GITHUB_ENV
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: my-artifact
-          path: ${{ env.ZIPNAME }}
 
       - name: Upload to Telegram
         uses: appleboy/telegram-action@master

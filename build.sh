@@ -21,12 +21,7 @@ if ! [ -d "$TC_DIR" ]; then
 	mkdir -p "$TC_DIR" && cd "$TC_DIR"
 	curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
 	bash ./antman -S
-	bash ./antman --patch=glibc
 	cd ../..
-	if ! [ -d "$TC_DIR" ]; then
-		echo "Cloning failed! Aborting..."
-		exit 1
-	fi
 fi
 
 cd "$TC_DIR" && bash ./antman -U && cd ../..
@@ -68,7 +63,6 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 		exit 1
 	fi
 	cp $kernel $dtb $dtbo AnyKernel3
-	rm -rf out/arch/arm64/boot
 	cd AnyKernel3
 	git checkout FSociety &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git README.md *placeholder
