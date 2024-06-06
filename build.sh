@@ -26,7 +26,6 @@ if ! [ -d "$TC_DIR" ]; then
    mkdir -p "$TC_DIR" && cd "$TC_DIR"
    curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
    bash ./antman -S
-   bash ./antman --patch=glibc
    cd ../..
 fi
 
@@ -75,7 +74,6 @@ elif ! git clone -q https://github.com/rd-stuffs/AnyKernel3 -b master; then
      exit 1
 fi
 cp $kernel $dtb $dtbo AnyKernel3
-rm -rf out/arch/arm64/boot
 cd AnyKernel3
 zip -r9 "../$ZIPNAME" * -x '*.git*' README.md *placeholder
 cd ..
