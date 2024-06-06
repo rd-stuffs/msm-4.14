@@ -7413,7 +7413,7 @@ static inline int __select_idle_sibling(struct task_struct *p, int prev, int tar
 	    recent_used_cpu != target &&
 	    cpus_share_cache(recent_used_cpu, target) &&
 	    (idle_cpu(recent_used_cpu) || sched_idle_cpu(recent_used_cpu)) &&
-	    cpumask_test_cpu(p->recent_used_cpu, &p->cpus_allowed)) {
+	    cpumask_test_cpu(p->recent_used_cpu, p->cpus_ptr)) {
 		/*
 		 * Replace recent_used_cpu with prev as it is a potential
 		 * candidate for the next wake.
@@ -8603,7 +8603,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 
 		if (sysctl_sched_sync_hint_enable && sync &&
 				_cpus_allowed && !_wake_cap &&
-				wake_affine_idle(sd, p, cpu, prev_cpu, sync) &&
+				wake_affine_idle(cpu, prev_cpu, sync) &&
 				cpu_is_in_target_set(p, cpu)) {
 			rcu_read_unlock();
 			return cpu;
