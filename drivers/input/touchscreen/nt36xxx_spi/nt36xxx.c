@@ -135,6 +135,33 @@ static uint8_t bTouchIsAwake;
 static uint8_t open_pocket_fail;
 static uint8_t close_pocket_fail;
 
+static int lyb_override = 0;
+module_param(lyb_override, int, 0644);
+
+static int lyb_ts_param = 0;
+module_param(lyb_ts_param, int, 0644);
+
+static int lyb_angle_callback = 270;
+module_param(lyb_angle_callback, int, 0644);
+
+static int lyb_palm_status = 0;
+module_param(lyb_palm_status, int, 0644);
+
+static int lyb_touch_game_mode = 1;
+module_param(lyb_touch_game_mode, int, 0644);
+
+static int lyb_touch_active_mode = 1;
+module_param(lyb_touch_active_mode, int, 0644);
+
+static int lyb_touch_up_thresh = 41;
+module_param(lyb_touch_up_thresh, int, 0644);
+
+static int lyb_touch_tolerance = 255;
+module_param(lyb_touch_tolerance, int, 0644);
+
+static int lyb_touch_edge = 1;
+module_param(lyb_touch_edge, int, 0644);
+
 #if WAKEUP_GESTURE
 #define WAKEUP_OFF 4
 #define WAKEUP_ON 5
@@ -287,21 +314,6 @@ static inline int32_t spi_read_write(struct spi_device *client, uint8_t *buf, si
 	spi_message_init(&m);
 	spi_message_add_tail(&t, &m);
 	return spi_sync(client, &m);
-}
-
-static void nvt_pm_qos(bool enable)
-{
-	if (unlikely(!pm_qos_request_active(&ts->pm_touch_req)) || 
-		unlikely(!pm_qos_request_active(&ts->pm_spi_req)))
-		return;
-
-	if (enable) {
-		pm_qos_update_request(&ts->pm_touch_req, 100);
-		pm_qos_update_request(&ts->pm_spi_req, 100);
-	} else {
-		pm_qos_update_request(&ts->pm_touch_req, PM_QOS_DEFAULT_VALUE);
-		pm_qos_update_request(&ts->pm_spi_req, PM_QOS_DEFAULT_VALUE);
-	}
 }
 
 /*******************************************************
@@ -1333,6 +1345,7 @@ int32_t nvt_check_palm(uint8_t input_id, uint8_t *data)
 /*2020.2.28 longcheer taocheng add for pocket mode end*/
 #endif
 
+#define POINT_DATA_LEN 65
 /*******************************************************
 Description:
 	Novatek touchscreen work function.
@@ -1340,11 +1353,8 @@ Description:
 return:
 	n.a.
 *******************************************************/
-#define POINT_DATA_LEN 65
-static void nvt_ts_worker(struct work_struct *work)
+static irqreturn_t nvt_ts_work_func(int irq, void *data)
 {
-	struct nvt_ts_data *ts = container_of(work, struct nvt_ts_data, irq_work);
-
 	int32_t ret = -1;
 	uint8_t point_data[POINT_DATA_LEN + 1 + DUMMY_BYTES] = {0};
 	uint32_t position = 0;
@@ -1365,13 +1375,12 @@ static void nvt_ts_worker(struct work_struct *work)
 		ret = wait_for_completion_timeout(&ts->dev_pm_suspend_completion, msecs_to_jiffies(700));
 		if (!ret) {
 			NVT_ERR("system(spi bus) can't finished resuming procedure, skip it");
-			return;
+			return IRQ_HANDLED;
 		}
 	}
 #endif
 #endif
 
-	nvt_pm_qos(true);
 	mutex_lock(&ts->lock);
 
 	ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + 1);
@@ -1414,10 +1423,11 @@ static void nvt_ts_worker(struct work_struct *work)
 	}
 #endif
 #if WAKEUP_GESTURE
-	if (unlikely(!bTouchIsAwake)) {
+	if (bTouchIsAwake == 0) {
 		//input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
-		goto XFER_ERROR;
+		mutex_unlock(&ts->lock);
+		return IRQ_HANDLED;
 	}
 #endif
 	finger_cnt = 0;
@@ -1496,6 +1506,7 @@ static void nvt_ts_worker(struct work_struct *work)
 
 #if LCT_TP_PALM_EN
 	//nvt_check_palm(input_id, point_data);
+	//mutex_unlock(&ts->lock);
 	//return IRQ_HANDLED;
 #endif
 
@@ -1514,25 +1525,13 @@ static void nvt_ts_worker(struct work_struct *work)
 		}
 	}
 #endif
+
 	input_sync(ts->input_dev);
 
 XFER_ERROR:
+
 	mutex_unlock(&ts->lock);
-	nvt_pm_qos(false);
-	return;
-}
 
-/*******************************************************
-Description:
-	Novatek touchscreen irq handler.
-
-return:
-	n.a.
-*******************************************************/
-static irqreturn_t nvt_ts_work_func(int irq, void *data)
-{
-	struct nvt_ts_data *ts = data;
-	queue_work(ts->coord_workqueue, &ts->irq_work);
 	return IRQ_HANDLED;
 }
 
@@ -1953,6 +1952,313 @@ out:
 }
 #endif
 
+/* 2019.12.6 longcheer taocheng add (xiaomi game mode) start */
+/*function description*/
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+
+static struct xiaomi_touch_interface xiaomi_touch_interfaces;
+
+int32_t nvt_xiaomi_read_reg(uint8_t *read_buf)
+{
+	uint8_t buf[8] = {0};
+	int32_t ret = 0;
+	msleep(35);
+
+	mutex_lock(&ts->reg_lock);
+
+	//---set xdata index to EVENT BUF ADDR---
+	nvt_set_page(ts->mmap->EVENT_BUF_ADDR | 0x5C);
+
+	// read reg_addr:0x21C5C
+	buf[0] = 0x5C;
+	buf[1] = 0x00;
+
+	ret = CTP_SPI_READ(ts->client, buf, 2);
+
+	*read_buf = ((buf[1] >> 2) & 0xFF);         // 0x21C5C 的內容會讀取放在 buf[1]
+	NVT_LOG("read_buf = %d\n", *read_buf);
+
+	mutex_unlock(&ts->reg_lock);
+
+	return ret;
+
+}
+
+
+int32_t nvt_xiaomi_write_reg(uint8_t write_buf_high, uint8_t write_buf_low)
+{
+
+	int32_t ret = 0;
+	uint8_t buf[8] = {0};
+
+	NVT_LOG("write_buf[1] = 0x%x, write_buf[2] = 0x%x,\n", write_buf_high, write_buf_low);
+	mutex_lock(&ts->reg_lock);
+
+	//---set xdata index to EVENT BUF ADDR---
+	nvt_set_page(ts->mmap->EVENT_BUF_ADDR | 0X50);
+
+	// Write 0x7D@offset 0x50, 0x51@offset 0x51
+	buf[0] = EVENT_MAP_HOST_CMD;    // write from 0x50
+	buf[1] = write_buf_high;    //write into 0x50
+	buf[2] = write_buf_low;		//write info 0x51
+
+	NVT_LOG("buf[0] = 0x%x, buf[1] = 0x%x, buf[2] = 0x%x\n", buf[0], buf[1], buf[2]);
+	ret = CTP_SPI_WRITE(ts->client, buf, 3);
+
+	mutex_unlock(&ts->reg_lock);
+
+	return ret;
+
+}
+
+static void nvt_init_touchmode_data(void)
+{
+	int i;
+
+	NVT_LOG("%s,ENTER\n", __func__);
+	/* Touch Game Mode Switch */
+	xiaomi_touch_interfaces.touch_mode[Touch_Game_Mode][GET_DEF_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Game_Mode][GET_MAX_VALUE] = 1;
+	xiaomi_touch_interfaces.touch_mode[Touch_Game_Mode][GET_MIN_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Game_Mode][SET_CUR_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Game_Mode][GET_CUR_VALUE] = 0;
+
+	/* Active Mode */
+	xiaomi_touch_interfaces.touch_mode[Touch_Active_MODE][GET_MAX_VALUE] = 1;
+	xiaomi_touch_interfaces.touch_mode[Touch_Active_MODE][GET_MIN_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Active_MODE][GET_DEF_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Active_MODE][SET_CUR_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Active_MODE][GET_CUR_VALUE] = 0;
+
+	/* sensivity */
+	xiaomi_touch_interfaces.touch_mode[Touch_UP_THRESHOLD][GET_MAX_VALUE] = 50;
+	xiaomi_touch_interfaces.touch_mode[Touch_UP_THRESHOLD][GET_MIN_VALUE] = 35;
+	xiaomi_touch_interfaces.touch_mode[Touch_UP_THRESHOLD][GET_DEF_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_UP_THRESHOLD][SET_CUR_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_UP_THRESHOLD][GET_CUR_VALUE] = 0;
+
+	/*  Tolerance */
+	xiaomi_touch_interfaces.touch_mode[Touch_Tolerance][GET_MAX_VALUE] = 255;
+	xiaomi_touch_interfaces.touch_mode[Touch_Tolerance][GET_MIN_VALUE] = 64;
+	xiaomi_touch_interfaces.touch_mode[Touch_Tolerance][GET_DEF_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Tolerance][SET_CUR_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Tolerance][GET_CUR_VALUE] = 0;
+	/* edge filter orientation*/
+	xiaomi_touch_interfaces.touch_mode[Touch_Panel_Orientation][GET_MAX_VALUE] = 3;
+	xiaomi_touch_interfaces.touch_mode[Touch_Panel_Orientation][GET_MIN_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Panel_Orientation][GET_DEF_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Panel_Orientation][SET_CUR_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Panel_Orientation][GET_CUR_VALUE] = 0;
+
+	/* edge filter area*/
+	xiaomi_touch_interfaces.touch_mode[Touch_Edge_Filter][GET_MAX_VALUE] = 3;
+	xiaomi_touch_interfaces.touch_mode[Touch_Edge_Filter][GET_MIN_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Edge_Filter][GET_DEF_VALUE] = 2;
+	xiaomi_touch_interfaces.touch_mode[Touch_Edge_Filter][SET_CUR_VALUE] = 0;
+	xiaomi_touch_interfaces.touch_mode[Touch_Edge_Filter][GET_CUR_VALUE] = 0;
+
+
+	for (i = 0; i < Touch_Mode_NUM; i++) {
+		NVT_LOG("mode:%d, set cur:%d, get cur:%d, def:%d min:%d max:%d\n",
+				i,
+				xiaomi_touch_interfaces.touch_mode[i][SET_CUR_VALUE],
+				xiaomi_touch_interfaces.touch_mode[i][GET_CUR_VALUE],
+				xiaomi_touch_interfaces.touch_mode[i][GET_DEF_VALUE],
+				xiaomi_touch_interfaces.touch_mode[i][GET_MIN_VALUE],
+				xiaomi_touch_interfaces.touch_mode[i][GET_MAX_VALUE]);
+	}
+
+	return;
+}
+
+static int nvt_set_cur_value_actual(int nvt_mode, int nvt_value)
+{
+
+	uint8_t nvt_game_value[2] = {0};
+	uint8_t temp_value = 0;
+	uint8_t reg_value = 0;
+	uint8_t ret = 0;
+
+	if (nvt_mode >= Touch_Mode_NUM && nvt_mode < 0) {
+		NVT_ERR("%s, nvt mode is error:%d", __func__, nvt_mode);
+		return -EINVAL;
+	} else if (xiaomi_touch_interfaces.touch_mode[nvt_mode][SET_CUR_VALUE] >
+			xiaomi_touch_interfaces.touch_mode[nvt_mode][GET_MAX_VALUE]) {
+
+		xiaomi_touch_interfaces.touch_mode[nvt_mode][SET_CUR_VALUE] =
+			xiaomi_touch_interfaces.touch_mode[nvt_mode][GET_MAX_VALUE];
+
+	} else if (xiaomi_touch_interfaces.touch_mode[nvt_mode][SET_CUR_VALUE] <
+			xiaomi_touch_interfaces.touch_mode[nvt_mode][GET_MIN_VALUE]) {
+
+		xiaomi_touch_interfaces.touch_mode[nvt_mode][SET_CUR_VALUE] =
+			xiaomi_touch_interfaces.touch_mode[nvt_mode][GET_MIN_VALUE];
+	}
+
+	xiaomi_touch_interfaces.touch_mode[nvt_mode][SET_CUR_VALUE] = nvt_value;
+
+	NVT_LOG("%s,nvt_mode:%d,nvt_vlue:%d", __func__, nvt_mode, nvt_value);
+
+	switch (nvt_mode) {
+	case Touch_Game_Mode:
+		break;
+	case Touch_Active_MODE:
+		break;
+	case Touch_UP_THRESHOLD:
+		/* 0,1,2 = default,no hover,strong hover reject*/
+		temp_value = xiaomi_touch_interfaces.touch_mode[Touch_UP_THRESHOLD][SET_CUR_VALUE];
+		if (temp_value >= 0 && temp_value < 35)
+			reg_value = 3;
+		else if (temp_value > 35 && temp_value <= 40)
+			reg_value = 0;
+		else if (temp_value > 40 && temp_value <= 45)
+			reg_value = 1;
+		else if (temp_value > 45 && temp_value <= 50)
+			reg_value = 2;
+		else
+			reg_value = 3;
+
+		nvt_game_value[0] = 0x71;
+		nvt_game_value[1] = reg_value;
+		break;
+	case Touch_Tolerance:
+		/* jitter 0,1,2,3,4,5 = default,weakest,weak,mediea,strong,strongest*/
+		temp_value = xiaomi_touch_interfaces.touch_mode[Touch_Tolerance][SET_CUR_VALUE];
+		if (lyb_ts_param == 1)
+		{
+			// expose more values
+			if (temp_value >= 0 && temp_value <= 80)
+				reg_value = 0;
+			else if (temp_value > 80 && temp_value <= 150)
+				reg_value = 1;
+			else if (temp_value > 150 && temp_value <= 200)
+				reg_value = 2;
+			else if (temp_value > 200 && temp_value <= 225)
+				reg_value = 3;
+			else if (temp_value > 225 && temp_value <= 235)
+				reg_value = 4;
+			else if (temp_value > 235 && temp_value <= 255)
+				reg_value = 5;
+		} else {
+			// default behaviour
+			if (temp_value >= 0 && temp_value <= 80)
+				reg_value = 0;
+			else if (temp_value > 80 && temp_value <= 150)
+				reg_value = 1;
+			else if (temp_value > 150 && temp_value <= 255)
+				reg_value = 2;
+		}
+		nvt_game_value[0] = 0x70;
+		nvt_game_value[1] = reg_value;
+		break;
+	case Touch_Edge_Filter:
+		/* filter 0,1,2,3,4,5,6,7,8 = default,1,2,3,4,5,6,7,8 level*/
+		temp_value = xiaomi_touch_interfaces.touch_mode[Touch_Edge_Filter][SET_CUR_VALUE];
+		reg_value = temp_value;
+
+		nvt_game_value[0] = 0x72;
+		nvt_game_value[1] = reg_value;
+		break;
+	case Touch_Panel_Orientation:
+		/* 0,1,2,3 = 0, 90, 180,270 */
+            	/*
+		temp_value = xiaomi_touch_interfaces.touch_mode[Touch_Panel_Orientation][SET_CUR_VALUE];
+		if (temp_value == 0 || temp_value == 2) {
+			nvt_game_value[0] = 0xBA;
+			nvt_game_value[1] = 0x00;
+		} else if (temp_value == 3) {
+			nvt_game_value[0] = 0xBB;
+			nvt_game_value[1] = 0x00;
+		} else if (temp_value == 1) {
+			nvt_game_value[0] = 0xBC;
+			nvt_game_value[1] = 0x00;
+		}
+                */
+		break;
+	default:
+		/* Don't support */
+		break;
+
+	};
+
+	NVT_LOG("0000 mode:%d, value:%d,temp_value:%d, game value:0x%x,0x%x",
+			nvt_mode, nvt_value, temp_value, nvt_game_value[0], nvt_game_value[1]);
+
+	xiaomi_touch_interfaces.touch_mode[nvt_mode][GET_CUR_VALUE] =
+		xiaomi_touch_interfaces.touch_mode[nvt_mode][SET_CUR_VALUE];
+	if (xiaomi_touch_interfaces.touch_mode[Touch_Game_Mode][SET_CUR_VALUE]) {
+
+		ret = nvt_xiaomi_write_reg(nvt_game_value[0], nvt_game_value[1]);
+		if (ret < 0) {
+			NVT_ERR("change game mode fail");
+		}
+	}
+	return 0;
+}
+
+static int nvt_set_cur_value(int nvt_mode, int nvt_value)
+{
+	// make sure userspace didn't set anything when overriden
+	if (lyb_override != 2)
+		return nvt_set_cur_value_actual(nvt_mode, nvt_value);
+	return 0;
+}
+
+static int nvt_get_mode_value(int mode, int value_type)
+{
+	int value = -1;
+
+	if (mode < Touch_Mode_NUM && mode >= 0)
+		value = xiaomi_touch_interfaces.touch_mode[mode][value_type];
+	else
+		NVT_ERR("%s, don't support\n", __func__);
+
+	return value;
+}
+
+static int nvt_get_mode_all(int mode, int *value)
+{
+	if (mode < Touch_Mode_NUM && mode >= 0) {
+		value[0] = xiaomi_touch_interfaces.touch_mode[mode][GET_CUR_VALUE];
+		value[1] = xiaomi_touch_interfaces.touch_mode[mode][GET_DEF_VALUE];
+		value[2] = xiaomi_touch_interfaces.touch_mode[mode][GET_MIN_VALUE];
+		value[3] = xiaomi_touch_interfaces.touch_mode[mode][GET_MAX_VALUE];
+	} else {
+		NVT_ERR("%s, don't support\n",  __func__);
+	}
+	NVT_LOG("%s, mode:%d, value:%d:%d:%d:%d\n", __func__, mode, value[0],
+			value[1], value[2], value[3]);
+
+	return 0;
+}
+
+static int nvt_reset_mode(int mode)
+{
+	int i = 0;
+
+	NVT_LOG("enter reset mode\n");
+
+	if (mode < Touch_Mode_NUM && mode > 0) {
+		xiaomi_touch_interfaces.touch_mode[mode][SET_CUR_VALUE] =
+			xiaomi_touch_interfaces.touch_mode[mode][GET_DEF_VALUE];
+		nvt_set_cur_value(mode, xiaomi_touch_interfaces.touch_mode[mode][SET_CUR_VALUE]);
+	} else if (mode == 0) {
+		for (i = Touch_Mode_NUM-1; i >= 0; i--) {
+			xiaomi_touch_interfaces.touch_mode[i][SET_CUR_VALUE] =
+				xiaomi_touch_interfaces.touch_mode[i][GET_DEF_VALUE];
+			nvt_set_cur_value(i, xiaomi_touch_interfaces.touch_mode[mode][SET_CUR_VALUE]);
+		}
+	} else {
+		NVT_ERR("%s, don't support\n",  __func__);
+	}
+
+	NVT_ERR("%s, mode:%d\n",  __func__, mode);
+
+	return 0;
+}
+#endif
+/* 2019.12.16 longcheer taocheng add (xiaomi game mode) end */
+
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -2041,7 +2347,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		goto err_get_regulator;
 	}
 
-	ret = nvt_ts_enable_regulator(false);//default disable regulator
+	ret = nvt_ts_enable_regulator(true);
 	if (ret < 0) {
 		NVT_ERR("Failed to enable regulator\n");
 		goto err_enable_regulator;
@@ -2159,8 +2465,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		NVT_LOG("int_trigger_type=%d\n", ts->int_trigger_type);
 		ts->irq_enabled = true;
 		ret = request_threaded_irq(client->irq, NULL, nvt_ts_work_func,
-				ts->int_trigger_type | IRQF_ONESHOT |
-				IRQF_PERF_AFFINE, NVT_SPI_NAME, ts);
+				ts->int_trigger_type | IRQF_ONESHOT, NVT_SPI_NAME, ts);
 		if (ret != 0) {
 			NVT_ERR("request irq failed. ret=%d\n", ret);
 			goto err_int_request_failed;
@@ -2169,17 +2474,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 			NVT_LOG("request irq %d succeed\n", client->irq);
 		}
 	}
-
-	ts->pm_spi_req.type = PM_QOS_REQ_AFFINE_IRQ;
-	ts->pm_spi_req.irq = geni_spi_get_master_irq(client);
-	irq_set_perf_affinity(ts->pm_spi_req.irq, IRQF_PERF_AFFINE);
-	pm_qos_add_request(&ts->pm_spi_req, PM_QOS_CPU_DMA_LATENCY,
-		PM_QOS_DEFAULT_VALUE);
-
-	ts->pm_touch_req.type = PM_QOS_REQ_AFFINE_IRQ;
-	ts->pm_touch_req.irq = client->irq;
-	pm_qos_add_request(&ts->pm_touch_req, PM_QOS_CPU_DMA_LATENCY,
-		PM_QOS_DEFAULT_VALUE);
 
 #if WAKEUP_GESTURE
 	device_init_wakeup(&ts->input_dev->dev, 1);
@@ -2275,20 +2569,14 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		NVT_LOG("init_lct_tp_palm Succeeded!");
 	}
 #endif
-	ts->coord_workqueue = alloc_workqueue("nvt_ts_workqueue", WQ_HIGHPRI, 0);
-	if (!ts->coord_workqueue) {
-		NVT_ERR("create nvt_ts_workqueue fail");
-		ret = -ENOMEM;
-		goto err_create_nvt_ts_workqueue_failed;
-	}
-	INIT_WORK(&ts->irq_work, nvt_ts_worker);
+
+#if defined(CONFIG_FB)
 	ts->workqueue = create_singlethread_workqueue("nvt_ts_workqueue");
 	if (!ts->workqueue) {
 		NVT_ERR("create nvt_ts_workqueue fail");
 		ret = -ENOMEM;
 		goto err_create_nvt_ts_workqueue_failed;
 	}
-#if defined(CONFIG_FB)
 	INIT_WORK(&ts->resume_work, nvt_ts_resume_work);
 #ifdef _MSM_DRM_NOTIFY_H_
 	ts->drm_notif.notifier_call = nvt_drm_notifier_callback;
@@ -2315,6 +2603,32 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		goto err_register_early_suspend_failed;
 	}
 #endif
+
+	/* 2019.12.16 longcheer taocheng add (xiaomi game mode) start */
+	/*function description*/
+	if (ts->nvt_tp_class == NULL) {
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+		ts->nvt_tp_class = get_xiaomi_touch_class();
+#endif
+		if (ts->nvt_tp_class) {
+			ts->nvt_touch_dev = device_create(ts->nvt_tp_class, NULL, 0x38, ts, "tp_dev");
+			if (IS_ERR(ts->nvt_touch_dev)) {
+				NVT_ERR("Failed to create device !\n");
+				goto err_class_create;
+			}
+			dev_set_drvdata(ts->nvt_touch_dev, ts);
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+			memset(&xiaomi_touch_interfaces, 0x00, sizeof(struct xiaomi_touch_interface));
+			xiaomi_touch_interfaces.getModeValue = nvt_get_mode_value;
+			xiaomi_touch_interfaces.setModeValue = nvt_set_cur_value;
+			xiaomi_touch_interfaces.resetMode = nvt_reset_mode;
+			xiaomi_touch_interfaces.getModeAll = nvt_get_mode_all;
+			nvt_init_touchmode_data();
+			xiaomitouch_register_modedata(&xiaomi_touch_interfaces);
+#endif
+		}
+	}
+	/* 2019.12.16 longcheer taocheng add (xiaomi game mode) end */
 
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
@@ -2344,10 +2658,13 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 	return 0;
 
-err_create_nvt_ts_workqueue_failed:
-	if (ts->coord_workqueue)
-		destroy_workqueue(ts->coord_workqueue);
+//2019.12.16 longcheer taocheng add (xiaomi game mode)
+err_class_create:
+	class_destroy(ts->nvt_tp_class);
+	ts->nvt_tp_class = NULL;
+
 #if defined(CONFIG_FB)
+err_create_nvt_ts_workqueue_failed:
 	if (ts->workqueue)
 		destroy_workqueue(ts->workqueue);
 #ifdef _MSM_DRM_NOTIFY_H_
@@ -2459,10 +2776,6 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 {
 	NVT_LOG("Removing driver...\n");
 
-	pm_qos_remove_request(&ts->pm_touch_req);
-	pm_qos_remove_request(&ts->pm_spi_req);
-	if (ts->coord_workqueue)
-		destroy_workqueue(ts->coord_workqueue);
 #if defined(CONFIG_FB)
 	if (ts->workqueue)
 		destroy_workqueue(ts->workqueue);
@@ -2705,6 +3018,23 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	return 0;
 }
 
+void lyb_apply_changes(void)
+{
+	if (lyb_override >= 1)	{
+		// 1 == AOSP with touch profile
+		lct_tp_set_screen_angle_callback(lyb_angle_callback);
+		if (lyb_override >= 2)	{
+			// 2 == AOSP without touch profile
+			set_lct_tp_palm_status((lyb_palm_status == 0));
+			nvt_set_cur_value_actual(Touch_Game_Mode, lyb_touch_game_mode);
+			nvt_set_cur_value_actual(Touch_Active_MODE, lyb_touch_active_mode);
+			nvt_set_cur_value_actual(Touch_UP_THRESHOLD, lyb_touch_up_thresh);
+			nvt_set_cur_value_actual(Touch_Tolerance, lyb_touch_tolerance);
+			nvt_set_cur_value_actual(Touch_Edge_Filter, lyb_touch_edge);
+		}
+	}
+}
+
 /*******************************************************
 Description:
 	Novatek touchscreen driver resume function.
@@ -2797,6 +3127,7 @@ static int32_t nvt_ts_resume(struct device *dev)
 		lct_nvt_tp_palm_callback(true);
 	}
 #endif
+	lyb_apply_changes();
 
 	return 0;
 }
@@ -2983,7 +3314,6 @@ static int32_t __init nvt_driver_init(void)
 	int32_t ret = 0;
 
 	NVT_LOG("start\n");
-
 #ifdef CHECK_TOUCH_VENDOR
 	//Check TP vendor
 	if (IS_ERR_OR_NULL(saved_command_line)) {
