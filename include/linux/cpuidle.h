@@ -290,4 +290,13 @@ static inline void cpuidle_set_idle_cpu(unsigned int cpu) { }
 static inline void cpuidle_clear_idle_cpu(unsigned int cpu) { }
 #endif
 
+#ifdef CONFIG_MSM_PM
+extern bool lpm_sleep_disabled(void);
+#else
+static bool lpm_sleep_disabled(void)
+{
+	return false;
+}
+#endif
+
 #endif /* _LINUX_CPUIDLE_H */
