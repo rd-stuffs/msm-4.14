@@ -30,6 +30,12 @@ jobs:
           HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
           echo "HEAD_COMMIT=${HEAD_COMMIT}" >> $GITHUB_ENV
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@main
+        with:
+          name: my-artifact
+          path: ${{ env.ZIPNAME }}
+
       - name: Upload to Telegram
         uses: appleboy/telegram-action@master
         with:
