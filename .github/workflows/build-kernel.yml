@@ -18,6 +18,8 @@ jobs:
 
       - name: Run build script
         run: |
+          export KBUILD_BUILD_USER=nobody
+          export KBUILD_BUILD_HOST=android-build
           source build.sh
           echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
 
