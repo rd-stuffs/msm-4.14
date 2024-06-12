@@ -701,6 +701,9 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
 		if (core_count == SINGLE_CORE_COUNT)
 			table[i].frequency = CPUFREQ_ENTRY_INVALID;
 
+		if (table[i].frequency == 300000)
+			table[i].frequency = CPUFREQ_ENTRY_INVALID;
+
 		/* Two of the same frequencies means end of table */
 		if (i > 0 && table[i - 1].driver_data == table[i].driver_data) {
 			struct cpufreq_frequency_table *prev = &table[i - 1];
