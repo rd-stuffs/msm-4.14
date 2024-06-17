@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2023-2024 Sultan Alsawaf <sultan@kerneltoast.com>.
+ * Copyright (C) 2023 Sultan Alsawaf <sultan@kerneltoast.com>.
  */
 
 /**
@@ -33,14 +33,14 @@ struct cass_cpu_cand {
 };
 
 static __always_inline
-unsigned long cass_cpu_util(int cpu, int this_cpu, bool sync)
+unsigned long cass_cpu_util(int cpu, bool sync)
 {
 	struct cfs_rq *cfs_rq = &cpu_rq(cpu)->cfs;
 	unsigned long util = READ_ONCE(cfs_rq->avg.util_avg);
 
 	/* Deduct @current's util from this CPU if this is a sync wake */
-	if (sync && cpu == this_cpu)
-		sub_positive(&util, task_util(current));
+	if (sync && cpu == smp_processor_id())
+		lsub_positive(&util, task_util(current));
 
 	if (sched_feat(UTIL_EST))
 		util = max_t(unsigned long, util,
@@ -53,7 +53,7 @@ unsigned long cass_cpu_util(int cpu, int this_cpu, bool sync)
 static __always_inline
 bool cass_cpu_better(const struct cass_cpu_cand *a,
 		     const struct cass_cpu_cand *b,
-		     int this_cpu, int prev_cpu, bool sync)
+		     int prev_cpu, bool sync)
 {
 #define cass_cmp(a, b) ({ res = (a) - (b); })
 #define cass_eq(a, b) ({ res = (a) == (b); })
@@ -64,7 +64,8 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 		goto done;
 
 	/* Prefer the current CPU for sync wakes */
-	if (sync && (cass_eq(a->cpu, this_cpu) || !cass_cmp(b->cpu, this_cpu)))
+	if (sync && (cass_eq(a->cpu, smp_processor_id()) ||
+		     !cass_cmp(b->cpu, smp_processor_id())))
 		goto done;
 
 	/* Prefer the CPU with higher capacity */
@@ -94,14 +95,15 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 {
 	/* Initialize @best such that @best always has a valid CPU at the end */
 	struct cass_cpu_cand cands[2], *best = cands, *curr;
-	int this_cpu = raw_smp_processor_id();
 	struct cpuidle_state *idle_state;
 	bool has_idle = false;
 	unsigned long p_util;
 	int cidx = 0, cpu;
 
 	/* Get the utilization for this task */
-	p_util = task_util_est(p);
+	p_util = clamp(task_util_est(p),
+		       uclamp_eff_value(p, UCLAMP_MIN),
+		       uclamp_eff_value(p, UCLAMP_MAX));
 
 	/*
 	 * Find the best CPU to wake @p on. The RCU read lock is needed for
@@ -115,21 +117,23 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 		curr->cpu = cpu;
 
 		/*
-		 * Check if this CPU is idle.
-		 * For sync wakes, treat the current CPU as idle if @current is the
-		 * only running task.
+		 * Check if this CPU is idle or only has SCHED_IDLE tasks. For
+		 * sync wakes, always treat the current CPU as idle.
 		 */
-		if ((sync && cpu == this_cpu && rq->nr_running == 1) || idle_cpu(cpu)) {
+		if ((sync && cpu == smp_processor_id()) ||
+		    sched_idle_cpu(cpu)) {
 			/* Discard any previous non-idle candidate */
-			if (!has_idle)
+			if (!has_idle) {
 				best = curr;
+				cidx ^= 1;
+			}
 			has_idle = true;
 
 			/* Nonzero exit latency indicates this CPU is idle */
 			curr->exit_lat = 1;
 
 			/* Add on the actual idle exit latency, if any */
-			idle_state = idle_get_state(cpu_rq(cpu));
+			idle_state = idle_get_state(rq);
 			if (idle_state)
 				curr->exit_lat += idle_state->exit_latency;
 		} else {
@@ -142,7 +146,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 		}
 
 		/* Get this CPU's utilization, possibly without @current */
-		curr->util = cass_cpu_util(cpu, this_cpu, sync);
+		curr->util = cass_cpu_util(cpu, sync);
 
 		/*
 		 * Add @p's utilization to this CPU if it's not @p's CPU, to
@@ -161,13 +165,12 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 		/* Calculate the relative utilization for this CPU candidate */
 		curr->util = curr->util * SCHED_CAPACITY_SCALE / curr->cap;
 
-		/*
-		 * Check if this CPU is better than the best CPU found so far.
-		 * If @best == @curr then there's no need to compare them, but
-		 * cidx still needs to be changed to the other candidate slot.
-		 */
-		if (best == curr ||
-		    cass_cpu_better(curr, best, this_cpu, prev_cpu, sync)) {
+		/* If @best == @curr then there's no need to compare them */
+		if (best == curr)
+			continue;
+
+		/* Check if this CPU is better than the best CPU found */
+		if (cass_cpu_better(curr, best, prev_cpu, sync)) {
 			best = curr;
 			cidx ^= 1;
 		}
