@@ -2232,11 +2232,18 @@ long _do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long nr;
 
-	/* Boost to the max for 50 ms when userspace launches an app */
+	/*
+	 * Boost to the max for 50 ms when userspace launches an app. Only
+	 * if within 1.5s input timeout.
+	 */
 	if (task_is_zygote(current)) {
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
-		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 50);
-		cpu_input_boost_kick_max(50);
+		if (df_boost_within_input(1500)) {
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
+			devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 50);
+		}
+		if (cpu_input_boost_within_input(1500)) {
+			cpu_input_boost_kick_max(50);
+		}
 	}
 
 	/*
