@@ -20,6 +20,7 @@
 #include <linux/sort.h>
 #include <linux/debugfs.h>
 #include <linux/ktime.h>
+#include <linux/devfreq_boost.h>
 #include <uapi/drm/sde_drm.h>
 #include <drm/drm_mode.h>
 #include <drm/drm_crtc.h>
@@ -4366,6 +4367,10 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 		return;
 
 	SDE_ATRACE_BEGIN("crtc_commit");
+
+	/* Boost when a new frame is ready to be committed */
+	devfreq_boost_kick(DEVFREQ_CPU_LLCC_DDR_BW);
+	devfreq_boost_kick(DEVFREQ_CPU_CPU_LLCC_BW);
 
 	is_error = _sde_crtc_prepare_for_kickoff_rot(dev, crtc);
 
