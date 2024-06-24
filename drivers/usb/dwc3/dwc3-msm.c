@@ -2911,7 +2911,7 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 		return 0;
 	}
 
-	pm_stay_awake(mdwc->dev);
+	pm_wakeup_event(mdwc->dev, 500);
 
 	if (mdwc->in_host_mode && mdwc->max_rh_port_speed == USB_SPEED_HIGH)
 		dwc3_msm_update_bus_bw(mdwc, BUS_VOTE_SVS);
