@@ -24,7 +24,9 @@ if ! [ -d "$TC_DIR" ]; then
 	cd ../..
 fi
 
-cd "$TC_DIR" && bash ./antman -U && cd ../..
+if [[ $1 = "-u" || $1 = "--update" ]]; then
+	cd "$TC_DIR" && bash ./antman -U && cd ../..
+fi
 
 if [[ $1 = "-r" || $1 = "--regen" ]]; then
 	make O=out ARCH=arm64 $DEFCONFIG savedefconfig
