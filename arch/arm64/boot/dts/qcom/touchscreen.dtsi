@@ -2,14 +2,6 @@
  * TouchScreen Device Tree For Xiaomi J20
  */
 
-&soc {
-	xiaomi_touch {
-		status = "ok";
-		compatible = "xiaomi-touch";
-		touch,name = "xiaomi-touch";
-	};
-};
-
 &qupv3_se0_spi {
 	status = "ok";
 
