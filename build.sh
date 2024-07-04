@@ -65,7 +65,7 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	cp $kernel $dtb $dtbo AnyKernel3
 	cd AnyKernel3
 	git checkout FSociety &> /dev/null
-	zip -r9 "../$ZIPNAME" * -x .git README.md *placeholder
+	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
 	cd ..
 	rm -rf AnyKernel3
 	echo -e "\nCompleted in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s) !"
