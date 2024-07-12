@@ -78,7 +78,7 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
   echo \#define LINUX_COMPILE_BY \"`echo $LINUX_COMPILE_BY | $UTS_TRUNCATE`\"
   echo \#define LINUX_COMPILE_HOST \"`echo $LINUX_COMPILE_HOST | $UTS_TRUNCATE`\"
   if [ -z "$KBUILD_COMPILER_STRING" ]; then
-    CC_VERSION=$($CC -v 2>&1 | grep ' version ' | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
+    CC_VERSION=$($CC -v 2>&1 | grep ' version ' | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//' -e 's/git//')
   else
     CC_VERSION="$KBUILD_COMPILER_STRING"
   fi
