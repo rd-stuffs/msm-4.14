@@ -99,6 +99,10 @@
 #define TIOCMIWAIT	0x545C	/* wait for a change on serial input line(s) */
 #define TIOCGICOUNT	0x545D	/* read serial port inline interrupt counts */
 
+#define TIOCPMGET_ALT	0x54ED  /* PM get, as used in post-4.19 kernels */
+#define TIOCPMPUT_ALT	0x54EE  /* PM put, as used in post-4.19 kernels */
+#define TIOCPMACT_ALT	0x54EF  /* PM is active, as used in post-4.19 kernels */
+
 /*
  * Some arches already define FIOQSIZE due to a historical
  * conflict with a Hayes modem-specific ioctl value.
