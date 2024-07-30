@@ -137,8 +137,8 @@ extern int direct_vm_swappiness;
 static int two_hundred = 200;
 #endif /* CONFIG_OPLUS_MM_HACKS */
 static int one_thousand = 1000;
-#ifdef CONFIG_PELT_COMPATIBILITY_LAYER
 static int two_hundred_fifty_five = 255;
+#ifdef CONFIG_PELT_COMPATIBILITY_LAYER
 static unsigned int ns_per_sec = NSEC_PER_SEC;
 static unsigned int __read_mostly sysctl_sched_group_upmigrate_pct = 100;
 static unsigned int __read_mostly sysctl_sched_group_downmigrate_pct = 95;
