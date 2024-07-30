@@ -65,6 +65,7 @@
 
 		qcom,gpu-quirk-hfi-use-reg;
 		qcom,gpu-quirk-secvid-set-once;
+		qcom,no-nap;
 
 		qcom,highest-bank-bit = <14>;
 
