@@ -135,10 +135,10 @@ static uint8_t bTouchIsAwake;
 static uint8_t open_pocket_fail;
 static uint8_t close_pocket_fail;
 
-static int lyb_override = 0;
+static int lyb_override = 2;
 module_param(lyb_override, int, 0644);
 
-static int lyb_ts_param = 0;
+static int lyb_ts_param = 1;
 module_param(lyb_ts_param, int, 0644);
 
 static int lyb_angle_callback = 270;
