@@ -697,9 +697,9 @@ int hif_napi_event(struct hif_opaque_softc *hif_ctx, enum qca_napi_event event,
 					napi = &(napii->napi);
 					NAPI_DEBUG("%s: disabling NAPI %d",
 						   __func__, i);
-					napi_disable(napi);
 					// Remove threaded setting when disabling NAPI
 					dev_set_threaded(napi->dev, false);
+					napi_disable(napi);
 					/* in case it is affined, remove it */
 					qdf_dev_set_irq_affinity(napii->irq,
 								 NULL);
