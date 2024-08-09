@@ -5797,11 +5797,9 @@ int __init workqueue_init_early(void)
 					    WQ_UNBOUND_MAX_ACTIVE);
 	system_freezable_wq = alloc_workqueue("events_freezable",
 					      WQ_FREEZABLE, 0);
-	system_power_efficient_wq = alloc_workqueue("events_power_efficient",
-					      WQ_POWER_EFFICIENT, 0);
-	system_freezable_power_efficient_wq = alloc_workqueue("events_freezable_power_efficient",
-					      WQ_FREEZABLE | WQ_POWER_EFFICIENT,
-					      0);
+	system_power_efficient_wq = alloc_workqueue("events", 0, 0);
+	system_freezable_power_efficient_wq = alloc_workqueue("events_freezable",
+					      WQ_FREEZABLE, 0);
 	BUG_ON(!system_wq || !system_highpri_wq || !system_long_wq ||
 	       !system_unbound_wq || !system_freezable_wq ||
 	       !system_power_efficient_wq ||
