@@ -158,15 +158,6 @@ static inline bool use_pelt(void)
 #endif
 }
 
-static inline bool conservative_pl(void)
-{
-#ifdef CONFIG_SCHED_WALT
-	return sysctl_sched_conservative_pl;
-#else
-	return false;
-#endif
-}
-
 static unsigned long freq_to_util(struct sugov_policy *sg_policy,
 				  unsigned int freq)
 {
@@ -432,11 +423,8 @@ static void sugov_walt_adjust(struct sugov_cpu *sg_cpu, unsigned long *util,
 	if (unlikely(!sysctl_sched_use_walt_cpu_util))
 		return;
 
-	if (sg_policy->tunables->pl && pl > *util) {
-		if (conservative_pl())
-			pl = mult_frac(pl, TARGET_LOAD, 100);
+	if (sg_policy->tunables->pl && pl > *util)
 		*util = (*util + pl) / 2;
-	}
 }
 
 static void sugov_update_single(struct update_util_data *hook, u64 time,
