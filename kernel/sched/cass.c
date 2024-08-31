@@ -52,12 +52,17 @@ unsigned long cass_cpu_util(int cpu, int this_cpu, bool sync)
 /* Returns true if @a is a better CPU than @b */
 static __always_inline
 bool cass_cpu_better(const struct cass_cpu_cand *a,
-		     const struct cass_cpu_cand *b,
+		     const struct cass_cpu_cand *b, unsigned long p_util,
 		     int this_cpu, int prev_cpu, bool sync)
 {
 #define cass_cmp(a, b) ({ res = (a) - (b); })
 #define cass_eq(a, b) ({ res = (a) == (b); })
 	long res;
+
+	/* Prefer the CPU that fits the task */
+	if (cass_cmp(fits_capacity(p_util, a->cap),
+		     fits_capacity(p_util, b->cap)))
+		goto done;
 
 	/* Prefer the CPU with lower relative utilization */
 	if (cass_cmp(b->util, a->util))
@@ -157,11 +162,8 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 		if (cpu != task_cpu(p))
 			curr->util += p_util;
 
-		/*
-		 * Get the current capacity of this CPU adjusted for thermal
-		 * pressure as well as IRQ and RT-task time.
-		 */
-		curr->cap = capacity_of(cpu);
+		/* Get the original, maximum _possible_ capacity of this CPU */
+		curr->cap = arch_scale_cpu_capacity(NULL, cpu);
 
 		/* Calculate the relative utilization for this CPU candidate */
 		curr->util = curr->util * SCHED_CAPACITY_SCALE / curr->cap;
@@ -173,7 +175,8 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 		 */
 		curr->cpu = cpu;
 		if (best == curr ||
-		    cass_cpu_better(curr, best, this_cpu, prev_cpu, sync)) {
+		    cass_cpu_better(curr, best, p_util, this_cpu, prev_cpu,
+				    sync)) {
 			best = curr;
 			cidx ^= 1;
 		}
