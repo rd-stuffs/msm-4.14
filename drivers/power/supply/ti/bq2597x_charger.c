@@ -1371,14 +1371,21 @@ static int bq2597x_detect_device(struct bq2597x *bq)
 	return ret;
 }
 
+#ifdef DEBUG
 static void bq2597x_dump_reg(struct bq2597x *bq);
+#endif
+
 #define RUNNING_PERIOD_S	(60 * 1000)
 
 static void bq2597x_monitor_work(struct work_struct *work)
 {
 	struct bq2597x *bq = container_of(work, struct bq2597x,
 						monitor_work.work);
+
+#ifdef DEBUG
 	bq2597x_dump_reg(bq);
+#endif
+
 	schedule_delayed_work(&bq->monitor_work,
 				msecs_to_jiffies(RUNNING_PERIOD_S));
 }
@@ -2024,6 +2031,7 @@ static int bq2597x_psy_register(struct bq2597x *bq)
 	return 0;
 }
 
+#ifdef DEBUG
 static void bq2597x_dump_reg(struct bq2597x *bq)
 {
 
@@ -2039,7 +2047,7 @@ static void bq2597x_dump_reg(struct bq2597x *bq)
 	}
 }
 EXPORT_SYMBOL_GPL(bq2597x_dump_reg);
-
+#endif
 
 static void bq2597x_check_alarm_status(struct bq2597x *bq)
 {
@@ -2159,9 +2167,12 @@ static irqreturn_t bq2597x_charger_interrupt(int irq, void *dev_id)
 	/* TODO */
 	bq2597x_check_alarm_status(bq);
 	bq2597x_check_fault_status(bq);
-
 	bq2597x_charger_info(bq);
+
+#ifdef DEBUG
 	bq2597x_dump_reg(bq);
+#endif
+
 	mutex_unlock(&bq->irq_complete);
 	power_supply_changed(bq->fc2_psy);
 
