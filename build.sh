@@ -20,7 +20,7 @@ if ! [ -d "$TC_DIR" ]; then
 	echo "Neutron Clang not found! Downloading to $TC_DIR..."
 	mkdir -p "$TC_DIR" && cd "$TC_DIR"
 	curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
-	bash ./antman -S
+	bash ./antman -S=09092023
 	cd ../..
 fi
 
