@@ -58,6 +58,7 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	rm -rf out/arch/arm64/boot
 	cd AnyKernel3
 	git checkout surya &> /dev/null
+	sed -i '/supported.versions=10.0-13.0/d' anykernel.sh
 	zip -r9 "../$ZIPNAME" * -x .git README.md *placeholder
 	cd ..
 	rm -rf AnyKernel3
