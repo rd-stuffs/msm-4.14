@@ -2812,6 +2812,7 @@ static int aw8624_haptics_playback(struct input_dev *dev, int effect_id,
 
 	VIB_FUNC_ENTER();
 	VIB_DEBUG("effect_id=%d , val = %d", effect_id, val);
+	aw8624->effect_id = effect_id;
 	VIB_DEBUG("aw8624->effect_id=%d , aw8624->activate_mode = %d",
 		  aw8624->effect_id, aw8624->activate_mode);
 
