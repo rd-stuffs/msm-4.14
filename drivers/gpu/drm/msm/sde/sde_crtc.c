@@ -20,7 +20,6 @@
 #include <linux/sort.h>
 #include <linux/debugfs.h>
 #include <linux/ktime.h>
-#include <linux/devfreq_boost.h>
 #include <linux/cpu_input_boost.h>
 #include <uapi/drm/sde_drm.h>
 #include <drm/drm_mode.h>
@@ -4375,10 +4374,6 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 	 * Boost when a new frame is ready to be committed. Only
 	 * if within 3.2s input timeout.
 	 */
-	if (df_boost_within_input(3250)) {
-		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
-		devfreq_boost_kick(DEVFREQ_MSM_LLCCBW);
-	}
 	if (cpu_input_boost_within_input(3250)) {
 		cpu_input_boost_kick();
 	}
