@@ -189,7 +189,7 @@ bool wcd9xxx_lock_sleep(
 		pr_debug("%s: holding wake lock\n", __func__);
 		pm_qos_update_request(&wcd9xxx_res->pm_qos_req,
 				      msm_cpuidle_get_deep_idle_latency());
-		pm_stay_awake(wcd9xxx_res->dev);
+		pm_wakeup_event(wcd9xxx_res->dev, 500);
 	}
 	mutex_unlock(&wcd9xxx_res->pm_lock);
 
