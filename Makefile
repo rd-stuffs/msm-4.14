@@ -756,6 +756,7 @@ KBUILD_AFLAGS   += -Os
 KBUILD_LDFLAGS  += -Os
 else
 ifeq ($(cc-name),clang)
+KBUILD_CFLAGS   += -mllvm -regalloc-enable-advisor=release
 KBUILD_CFLAGS   += -mllvm -hot-cold-split=true
 KBUILD_CFLAGS   += -mcpu=cortex-a55 -mtune=cortex-a55
 KBUILD_CFLAGS   += -O3 -march=armv8.2-a+lse+crypto+dotprod+crc --cuda-path=/dev/null
@@ -958,12 +959,12 @@ endif
 
 ifdef CONFIG_LTO_CLANG
 ifdef CONFIG_THINLTO
-lto-clang-flags	:= -flto=thin
+lto-clang-flags	:= -flto=thin -fsplit-lto-unit -funified-lto
 LDFLAGS		+= --thinlto-cache-dir=.thinlto-cache --thinlto-jobs=$(nproc --all)
 else
 lto-clang-flags	:= -flto
 endif
-lto-clang-flags += -fvisibility=default $(call cc-option, -fsplit-lto-unit)
+lto-clang-flags += -fvisibility=hidden -fsplit-machine-functions
 
 # Limit inlining across translation units to reduce binary size
 KBUILD_LDFLAGS += -mllvm -import-instr-limit=40
