@@ -23,7 +23,7 @@
 #include "adsp_err.h"
 #include "q6afecal-hwdep.h"
 
-#define WAKELOCK_TIMEOUT	5000
+#define WAKELOCK_TIMEOUT	500
 #define AFE_CLK_TOKEN	1024
 enum {
 	AFE_COMMON_RX_CAL = 0,

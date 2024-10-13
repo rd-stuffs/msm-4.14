@@ -33,7 +33,7 @@ static int32_t tas_smartamp_algo_callback(uint32_t *payload,
 #endif /*INSTANCE_ID_0*/
 #endif /*CONFIG_TAS25XX_ALGO*/
 
-#define WAKELOCK_TIMEOUT	5000
+#define WAKELOCK_TIMEOUT	500
 enum {
 	AFE_COMMON_RX_CAL = 0,
 	AFE_COMMON_TX_CAL,
