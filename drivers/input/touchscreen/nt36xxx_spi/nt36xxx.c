@@ -25,6 +25,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/pm_runtime.h>
+#include <uapi/linux/sched/types.h>
 
 #if defined(CONFIG_FB)
 #ifdef CONFIG_DRM_MSM
@@ -1341,6 +1342,13 @@ static void nvt_ts_worker(struct work_struct *work)
 #endif /* MT_PROTOCOL_B */
 	int32_t i = 0;
 	int32_t finger_cnt = 0;
+	static struct task_struct *touch_task = NULL;
+	struct sched_param par = {.sched_priority = MAX_RT_PRIO - 1};
+
+	if (touch_task == NULL) {
+		touch_task = current;
+		sched_setscheduler_nocheck(touch_task, SCHED_FIFO, &par);
+	}
 
 #if WAKEUP_GESTURE
 #ifdef CONFIG_PM
