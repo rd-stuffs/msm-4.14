@@ -458,7 +458,7 @@
 	};
 
 	chosen {
-		bootargs = "rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket kpti=off quiet noirqdebug nosoftlockup mce=ignore_ce";
+		bootargs = "rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket kpti=off quiet noirqdebug nosoftlockup mce=ignore_ce printk.always_kmsg_dump=1";
 	};
 
 	soc: soc { };
@@ -647,11 +647,12 @@
 		/* reserve for pstore */
 		ramoops_mem: ramoops@9d800000 {
 			compatible = "ramoops";
-			reg = <0x0 0x9d800000 0x0 0x00400000>;
+			reg = <0x0 0x9d800000 0x0 0x00600000>;
 
-			record-size = <0x80000>;
+			ecc-size = <16>;
+			record-size = <0x200000>;
+			console-size = <0x200000>;
 			pmsg-size = <0x200000>;
-			console-size = <0x100000>;
 		};
 	};
 };
