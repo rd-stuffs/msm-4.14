@@ -149,7 +149,7 @@ static ssize_t fscaps_show(struct kobject *kobj,
 KERNEL_ATTR_RO(fscaps);
 
 #ifndef CONFIG_TINY_RCU
-int rcu_expedited = IS_ENABLED(CONFIG_ANDROID);
+int rcu_expedited;
 static ssize_t rcu_expedited_show(struct kobject *kobj,
 				  struct kobj_attribute *attr, char *buf)
 {
@@ -166,7 +166,7 @@ static ssize_t rcu_expedited_store(struct kobject *kobj,
 }
 KERNEL_ATTR_RW(rcu_expedited);
 
-int rcu_normal = !IS_ENABLED(CONFIG_ANDROID);
+int rcu_normal;
 static ssize_t rcu_normal_show(struct kobject *kobj,
 			       struct kobj_attribute *attr, char *buf)
 {
