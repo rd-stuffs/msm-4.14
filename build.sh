@@ -5,7 +5,7 @@
 
 SECONDS=0 # builtin bash timer
 ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-neutron"
+TC_DIR="$(pwd)/tc/clang-19"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="surya_defconfig"
 
@@ -17,15 +17,14 @@ fi
 export PATH="$TC_DIR/bin:$PATH"
 
 if ! [ -d "$TC_DIR" ]; then
-	echo "Neutron Clang not found! Downloading to $TC_DIR..."
-	mkdir -p "$TC_DIR" && cd "$TC_DIR"
-	curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
-	bash ./antman -S
-	cd ../..
-fi
-
-if [[ $1 = "-u" || $1 = "--update" ]]; then
-	cd "$TC_DIR" && bash ./antman -U && cd ../..
+	echo "Slim LLVM not found! Cloning to $TC_DIR..."
+	if ! git clone --depth=1 -b 19 https://github.com/rd-stuffs/prebuilts_clang-standalone.git "$TC_DIR"; then
+		echo "Cloning failed! Aborting..."
+		exit 1
+	fi
+	if ! [ -f "$TC_DIR/bin/clang-19" ]; then
+	    gunzip "$TC_DIR/bin/clang-19.gz"
+	fi
 fi
 
 if [[ $1 = "-r" || $1 = "--regen" ]]; then
