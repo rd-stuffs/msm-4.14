@@ -18,12 +18,9 @@ export PATH="$TC_DIR/bin:$PATH"
 
 if ! [ -d "$TC_DIR" ]; then
 	echo "Slim LLVM not found! Cloning to $TC_DIR..."
-	if ! git clone --depth=1 -b 19 https://github.com/rd-stuffs/prebuilts_clang-standalone.git "$TC_DIR"; then
+	if ! git clone --depth=1 -b 19 https://bitbucket.org/rdxzv/clang-standalone.git "$TC_DIR"; then
 		echo "Cloning failed! Aborting..."
 		exit 1
-	fi
-	if ! [ -f "$TC_DIR/bin/clang-19" ]; then
-	    gunzip "$TC_DIR/bin/clang-19.gz"
 	fi
 fi
 
