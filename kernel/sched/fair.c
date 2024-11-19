@@ -12314,7 +12314,7 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 		 * work being done for other cpus. Next load
 		 * balancing owner will pick it up.
 		 */
-		if (need_resched())
+		if (!idle_cpu(this_cpu) && need_resched())
 			break;
 
 		rq = cpu_rq(balance_cpu);
