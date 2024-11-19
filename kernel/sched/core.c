@@ -2692,7 +2692,7 @@ void scheduler_ipi(void)
 	 */
 	if (unlikely(got_nohz_idle_kick()) && !cpu_isolated(cpu)) {
 		this_rq()->idle_balance = 1;
-		raise_softirq_irqoff(SCHED_SOFTIRQ);
+		__raise_softirq_irqoff(SCHED_SOFTIRQ);
 	}
 	irq_exit();
 }
