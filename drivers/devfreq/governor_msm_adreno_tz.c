@@ -13,6 +13,7 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/devfreq.h>
+#include <linux/devfreq_boost.h>
 #include <linux/math64.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
@@ -383,7 +384,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 
 		scm_data[0] = level;
 		scm_data[1] = priv->bin.total_time;
-		if (refresh_rate > 60)
+		if (refresh_rate > 60 && df_boost_within_input(3250))
 			scm_data[2] = priv->bin.busy_time * refresh_rate / 60;
 		else
 			scm_data[2] = priv->bin.busy_time;
