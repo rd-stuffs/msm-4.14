@@ -2252,11 +2252,13 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 	pinfo->dcs_cmd_by_left = of_property_read_bool(np,
 		"qcom,dcs-cmd-by-left");
 
-	pinfo->ulps_feature_enabled = true;
+	pinfo->ulps_feature_enabled = of_property_read_bool(np,
+		"qcom,ulps-enabled");
 	pr_info("%s: ulps feature %s\n", __func__,
 		(pinfo->ulps_feature_enabled ? "enabled" : "disabled"));
 
-	pinfo->ulps_suspend_enabled = true;
+	pinfo->ulps_suspend_enabled = of_property_read_bool(np,
+		"qcom,suspend-ulps-enabled");
 	pr_info("%s: ulps during suspend feature %s", __func__,
 		(pinfo->ulps_suspend_enabled ? "enabled" : "disabled"));
 
@@ -2265,7 +2267,8 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 	pinfo->panel_ack_disabled = pinfo->sim_panel_mode ?
 		1 : of_property_read_bool(np, "qcom,panel-ack-disabled");
 
-	pinfo->allow_phy_power_off = true;
+	pinfo->allow_phy_power_off = of_property_read_bool(np,
+		"qcom,panel-allow-phy-poweroff");
 
 	mdss_dsi_parse_esd_params(np, ctrl);
 
