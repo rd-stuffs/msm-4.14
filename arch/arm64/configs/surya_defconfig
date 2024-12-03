@@ -1885,6 +1885,11 @@ CONFIG_CNSS_GENL=y
 # CONFIG_ISDN is not set
 
 #
+# KernelSU
+#
+# CONFIG_KSU is not set
+
+#
 # Input device support
 #
 CONFIG_INPUT=y
