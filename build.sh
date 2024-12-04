@@ -38,20 +38,57 @@ if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
 	exit
 fi
 
-if [[ $1 = "-c" || $1 = "--clean" ]]; then
+CLEAN_BUILD=false
+ENABLE_KSU=false
+
+for arg in "$@"; do
+	case $arg in
+		-c|--clean)
+			CLEAN_BUILD=true
+			;;
+		-s|--su)
+			ENABLE_KSU=true
+			ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+			;;
+		*)
+			echo "Unknown argument: $arg"
+			exit 1
+			;;
+	esac
+done
+
+if $CLEAN_BUILD; then
+	echo "Cleaning output directory..."
 	rm -rf out
 fi
 
+if $ENABLE_KSU; then
+	echo "Building with KSU support..."
+	KSU_DEFCONFIG="ksu_${DEFCONFIG}"
+	KSU_DEFCONFIG_PATH="arch/arm64/configs/${KSU_DEFCONFIG}"
+	cp arch/arm64/configs/$DEFCONFIG $KSU_DEFCONFIG_PATH
+	sed -i 's/FSociety/FSociety-KSU/g' $KSU_DEFCONFIG_PATH
+	sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' $KSU_DEFCONFIG_PATH
+fi
+
 echo -e "\nStarting compilation...\n"
-make $DEFCONFIG
+if $ENABLE_KSU; then
+	make $KSU_DEFCONFIG
+else
+	make $DEFCONFIG
+fi
 make -j$(nproc --all) LLVM=1 Image.gz dtb.img dtbo.img 2> >(tee log.txt >&2) || exit $?
+
+if $ENABLE_KSU; then
+	rm $KSU_DEFCONFIG_PATH
+fi
 
 kernel="out/arch/arm64/boot/Image.gz"
 dtb="out/arch/arm64/boot/dtb.img"
 dtbo="out/arch/arm64/boot/dtbo.img"
 
 if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
-	echo -e "\nKernel compiled succesfully! Zipping up...\n"
+	echo -e "\nKernel compiled successfully! Zipping up...\n"
 	if [ -d "$AK3_DIR" ]; then
 		cp -r $AK3_DIR AnyKernel3
 	elif ! git clone -q --depth=1 https://github.com/rd-stuffs/AnyKernel3 -b FSociety; then
