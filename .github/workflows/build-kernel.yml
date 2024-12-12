@@ -16,34 +16,49 @@ jobs:
         with:
           timezoneLinux: "America/Sao_Paulo"
 
-      - name: Run build script
+      - name: Run standard build script
         run: |
           export KBUILD_BUILD_USER=nobody
           export KBUILD_BUILD_HOST=android-build
           source build.sh
           echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
 
-      - name: Setup build date
-        run: echo "BUILD_DATE=$(date '+%H:%M %d/%m/%Y')" >> $GITHUB_ENV
-
-      - name: Git variables
+      - name: Run KSU build script
         run: |
-          HEAD="$(git rev-parse HEAD)"
-          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
-          echo "HEAD_COMMIT=${HEAD_COMMIT}" >> $GITHUB_ENV
+          export KBUILD_BUILD_USER=nobody
+          export KBUILD_BUILD_HOST=android-build
+          source build.sh --su
+          echo "ZIPNAME_KSU=${ZIPNAME}" >> $GITHUB_ENV
 
-      - name: Upload build artifact
+      - name: Upload standard artifact
         uses: actions/upload-artifact@main
         with:
+          name: standard-artifact
           path: ${{ env.ZIPNAME }}
 
-      - name: Upload to Telegram
-        uses: appleboy/telegram-action@master
+      - name: Upload KSU artifact
+        uses: actions/upload-artifact@main
         with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          document: ${{ env.ZIPNAME }}
-          message: |
-             ${{ env.BUILD_DATE }}
-             
-             ${{ env.HEAD_COMMIT }}
+          name: KSU-artifact
+          path: ${{ env.ZIPNAME_KSU }}
+
+      - name: Create Telegram caption
+        run: |
+          BUILD_DATE="$(date '+%H:%M %d/%m/%Y')"
+          HEAD="$(git rev-parse HEAD)"
+          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
+          echo -e "${BUILD_DATE}\n\n${HEAD_COMMIT}" > caption.txt
+
+      - name: Upload standard build to Telegram
+        run: |
+          caption=$(<caption.txt)
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+          -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+          -F document=@"${{ env.ZIPNAME }}" \
+          -F caption="${caption}"
+
+      - name: Upload KSU build to Telegram
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+          -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+          -F document=@"${{ env.ZIPNAME_KSU }}"
