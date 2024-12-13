@@ -69,6 +69,7 @@ if $ENABLE_KSU; then
 	cp arch/arm64/configs/$DEFCONFIG $KSU_DEFCONFIG_PATH
 	sed -i 's/FSociety/FSociety-KSU/g' $KSU_DEFCONFIG_PATH
 	sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' $KSU_DEFCONFIG_PATH
+	trap '[[ -f $KSU_DEFCONFIG_PATH ]] && rm -f $KSU_DEFCONFIG_PATH' EXIT
 fi
 
 echo -e "\nStarting compilation...\n"
@@ -78,10 +79,6 @@ else
 	make $DEFCONFIG
 fi
 make -j$(nproc --all) LLVM=1 Image.gz dtb.img dtbo.img 2> >(tee log.txt >&2) || exit $?
-
-if $ENABLE_KSU; then
-	rm $KSU_DEFCONFIG_PATH
-fi
 
 kernel="out/arch/arm64/boot/Image.gz"
 dtb="out/arch/arm64/boot/dtb.img"
