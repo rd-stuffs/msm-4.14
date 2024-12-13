@@ -32,7 +32,7 @@
 #define src1end	x7
 #define src2end	x8
 
-WEAK(memcmp)
+SYM_FUNC_START_WEAK_PI(memcmp)
 
 	cmp	limit, 16
 	b.lo	L(less16)
@@ -187,4 +187,5 @@ L(loop64):
 	cneg	result, result, lo
 	ret
 
-ENDPIPROC(memcmp)
+SYM_FUNC_END_PI(memcmp)
+EXPORT_SYMBOL_NOKASAN(memcmp)
