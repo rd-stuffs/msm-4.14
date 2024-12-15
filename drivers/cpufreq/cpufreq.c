@@ -713,7 +713,7 @@ static ssize_t show_scaling_cur_freq(struct cpufreq_policy *policy, char *buf)
 	return ret;
 }
 
-bool unblock_frequency;
+bool unblock_frequency = true;
 
 module_param(unblock_frequency, bool, 0644);
 
