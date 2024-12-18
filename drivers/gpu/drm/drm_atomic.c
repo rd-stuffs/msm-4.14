@@ -2264,13 +2264,13 @@ static int __drm_mode_atomic_ioctl(struct drm_device *dev, void *data,
 
 	/*
 	 * Boost upon running an atomic ioctl. Only
-	 * if within 3.2s input timeout.
+	 * if within 7s input timeout.
 	 */
 	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY)) {
-		if (cpu_input_boost_within_input(3250)) {
+		if (cpu_input_boost_within_input(7000)) {
 			cpu_input_boost_kick();
 		}
-		if (df_boost_within_input(3250)) {
+		if (df_boost_within_input(7000)) {
 			devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
 			devfreq_boost_kick(DEVFREQ_MSM_LLCCBW);
 		}

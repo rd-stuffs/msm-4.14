@@ -4373,12 +4373,12 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 
 	/*
 	 * Boost when a new frame is ready to be committed. Only
-	 * if within 3.2s input timeout.
+	 * if within 7s input timeout.
 	 */
-	if (cpu_input_boost_within_input(3250)) {
+	if (cpu_input_boost_within_input(7000)) {
 		cpu_input_boost_kick();
 	}
-	if (df_boost_within_input(3250)) {
+	if (df_boost_within_input(7000)) {
 		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
 		devfreq_boost_kick(DEVFREQ_MSM_LLCCBW);
 	}
