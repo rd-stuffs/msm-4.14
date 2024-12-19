@@ -16,12 +16,52 @@ fi
 
 export PATH="$TC_DIR/bin:$PATH"
 
-if ! [ -d "$TC_DIR" ]; then
-	echo "Slim LLVM not found! Cloning to $TC_DIR..."
-	if ! git clone --depth=1 -b 19 https://bitbucket.org/rdxzv/clang-standalone.git "$TC_DIR"; then
-		echo "Cloning failed! Aborting..."
-		exit 1
-	fi
+sync_repo() {
+    local dir=$1
+    local repo_url=$2
+    local branch=$3
+	local update=$4
+
+    if [ -d "$dir" ]; then
+        if $update; then
+			# Fetch the latest changes
+            git -C "$dir" fetch origin --quiet
+
+            # Compare local and remote commits
+            LOCAL_COMMIT=$(git -C "$dir" rev-parse HEAD)
+            REMOTE_COMMIT=$(git -C "$dir" rev-parse "origin/$branch")
+
+            # If there are changes, reset and log the update
+            if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
+                git -C "$dir" reset --quiet --hard "origin/$branch"
+                LATEST_COMMIT=$(git -C "$dir" log -1 --oneline)
+                echo -e "Updated $repo_url to: $LATEST_COMMIT\n" | tee -a "$dir/updates.txt"
+            else
+                echo "No changes found for $repo_url. Skipping update."
+            fi
+        fi
+    else
+        # Clone the repository if it doesn't exist
+        echo "Cloning $repo_url to $dir..."
+        if ! git clone --quiet --depth=1 -b "$branch" "$repo_url" "$dir"; then
+            echo "Cloning failed! Aborting..."
+            exit 1
+        fi
+    fi
+}
+
+if [[ $1 = "-u" || $1 = "--update" ]]; then
+    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" true
+    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "19" true
+	exit
+else
+    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" false
+    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "19" false
+fi
+
+if [ ! -d "$AK3_DIR" ] || [ ! -d "$TC_DIR" ]; then
+    echo "Error: Required directories are missing. Aborting the build process."
+    exit 1
 fi
 
 if [[ $1 = "-r" || $1 = "--regen" ]]; then
@@ -86,12 +126,7 @@ dtbo="out/arch/arm64/boot/dtbo.img"
 
 if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	echo -e "\nKernel compiled successfully! Zipping up...\n"
-	if [ -d "$AK3_DIR" ]; then
-		cp -r $AK3_DIR AnyKernel3
-	elif ! git clone -q --depth=1 https://github.com/rd-stuffs/AnyKernel3 -b FSociety; then
-		echo -e "\nAnyKernel3 repo not found locally and couldn't clone from GitHub! Aborting..."
-		exit 1
-	fi
+	cp -r $AK3_DIR AnyKernel3
 	cp $kernel $dtb $dtbo AnyKernel3
 	cd AnyKernel3
 	git checkout FSociety &> /dev/null
