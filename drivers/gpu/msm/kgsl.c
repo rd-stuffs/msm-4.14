@@ -5071,8 +5071,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	}
 
 	status = devm_request_irq(device->dev, device->pwrctrl.interrupt_num,
-				  kgsl_irq_handler, IRQF_TRIGGER_HIGH |
-				  IRQF_PERF_KGSL_AFFINE, device->name, device);
+				  kgsl_irq_handler, IRQF_TRIGGER_HIGH,
+				  device->name, device);
 	if (status) {
 		KGSL_DRV_ERR(device, "request_irq(%d) failed: %d\n",
 			      device->pwrctrl.interrupt_num, status);
@@ -5227,13 +5227,10 @@ static void kgsl_core_exit(void)
 }
 
 static long kgsl_run_one_worker(struct kthread_worker *worker,
-		struct task_struct **thread, const char *name, bool perf_crit)
+		struct task_struct **thread, const char *name)
 {
 	kthread_init_worker(worker);
-	if (perf_crit)
-		*thread = kthread_run_perf_critical(cpu_perf_kgsl_mask, kthread_worker_fn, worker, name);
-	else
-		*thread = kthread_run(kthread_worker_fn, worker, name);
+	*thread = kthread_run(kthread_worker_fn, worker, name);
 	if (IS_ERR(*thread)) {
 		pr_err("unable to start %s\n", name);
 		return PTR_ERR(thread);
@@ -5328,10 +5325,10 @@ static int __init kgsl_core_init(void)
 
 	if (IS_ERR_VALUE(kgsl_run_one_worker(&kgsl_driver.worker,
 			&kgsl_driver.worker_thread,
-			"kgsl_worker_thread", true)) ||
+			"kgsl_worker_thread")) ||
 		IS_ERR_VALUE(kgsl_run_one_worker(&kgsl_driver.low_prio_worker,
 			&kgsl_driver.low_prio_worker_thread,
-			"kgsl_low_prio_worker_thread", false)))
+			"kgsl_low_prio_worker_thread")))
 		goto err;
 
 	sched_setscheduler(kgsl_driver.worker_thread, SCHED_FIFO, &param);
