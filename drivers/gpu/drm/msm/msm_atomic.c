@@ -619,8 +619,7 @@ static void _msm_drm_commit_work_cb(struct kthread_work *work)
 						 commit_work);
 	struct pm_qos_request req = {
 		.type = PM_QOS_REQ_AFFINE_CORES,
-		.cpus_affine = BIT(raw_smp_processor_id()) |
-					   *cpumask_bits(cpu_perf_mask)
+		.cpus_affine = BIT(raw_smp_processor_id())
 	};
 
 	/*
