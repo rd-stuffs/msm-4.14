@@ -131,51 +131,6 @@ module_param_cb(cpu_min_freq, &param_ops_cpu_min_freq, NULL, 0644);
 
 static int set_cpu_max_freq(const char *buf, const struct kernel_param *kp)
 {
-	int i, j, ntokens = 0;
-	unsigned int val, cpu;
-	const char *cp = buf;
-	struct cpu_status *i_cpu_stats;
-	struct cpufreq_policy policy;
-	cpumask_var_t limit_mask;
-
-	while ((cp = strpbrk(cp + 1, " :")))
-		ntokens++;
-
-	/* CPU:value pair */
-	if (!(ntokens % 2))
-		return -EINVAL;
-
-	cp = buf;
-	cpumask_clear(limit_mask);
-	for (i = 0; i < ntokens; i += 2) {
-		if (sscanf(cp, "%u:%u", &cpu, &val) != 2)
-			return -EINVAL;
-		if (cpu > (num_present_cpus() - 1))
-			return -EINVAL;
-
-		i_cpu_stats = &per_cpu(cpu_stats, cpu);
-
-		i_cpu_stats->max = val;
-		cpumask_set_cpu(cpu, limit_mask);
-
-		cp = strnchr(cp, strlen(cp), ' ');
-		cp++;
-	}
-
-	get_online_cpus();
-	for_each_cpu(i, limit_mask) {
-		i_cpu_stats = &per_cpu(cpu_stats, i);
-		if (cpufreq_get_policy(&policy, i))
-			continue;
-
-		if (cpu_online(i) && (policy.max != i_cpu_stats->max))
-			cpufreq_update_policy(i);
-
-		for_each_cpu(j, policy.related_cpus)
-			cpumask_clear_cpu(j, limit_mask);
-	}
-	put_online_cpus();
-
 	return 0;
 }
 
