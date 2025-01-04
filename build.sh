@@ -107,7 +107,6 @@ if $ENABLE_KSU; then
 	KSU_DEFCONFIG="ksu_${DEFCONFIG}"
 	KSU_DEFCONFIG_PATH="arch/arm64/configs/${KSU_DEFCONFIG}"
 	cp arch/arm64/configs/$DEFCONFIG $KSU_DEFCONFIG_PATH
-	sed -i 's/FSociety/FSociety-KSU/g' $KSU_DEFCONFIG_PATH
 	sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' $KSU_DEFCONFIG_PATH
 	trap '[[ -f $KSU_DEFCONFIG_PATH ]] && rm -f $KSU_DEFCONFIG_PATH' EXIT
 fi
