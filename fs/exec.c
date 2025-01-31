@@ -99,6 +99,11 @@ void dead_special_task(void)
 static LIST_HEAD(formats);
 static DEFINE_RWLOCK(binfmt_lock);
 
+#define SFLINGER_BIN_PREFIX "/system/bin/surfaceflinger"
+#define FINGERPRINT_BIN_PREFIX "/vendor/bin/hw/android.hardware.biometrics.fingerprint"
+#define HWCOMPOSER_BIN_PREFIX "/vendor/bin/hw/android.hardware.graphics.composer"
+#define GRALLOC_BIN_PREFIX "/vendor/bin/hw/vendor.qti.hardware.display.allocator"
+
 #define ZYGOTE32_BIN "/system/bin/app_process32"
 #define ZYGOTE64_BIN "/system/bin/app_process64"
 static struct signal_struct *zygote32_sig;
@@ -1920,7 +1925,31 @@ static int do_execveat_common(int fd, struct filename *filename,
 		goto out;
 
 	if (is_global_init(current->parent)) {
-		if (unlikely(!strcmp(filename->name, PERFD_BIN))) {
+		if (unlikely(!strncmp(filename->name,
+					   SFLINGER_BIN_PREFIX,
+					   strlen(SFLINGER_BIN_PREFIX)))) {
+			current->flags |= PF_PERF_CRITICAL;
+			set_cpus_allowed_ptr(current, cpu_perf_mask);
+		}
+		else if (unlikely(!strncmp(filename->name,
+					   FINGERPRINT_BIN_PREFIX,
+					   strlen(FINGERPRINT_BIN_PREFIX)))) {
+			current->flags |= PF_PERF_CRITICAL;
+			set_cpus_allowed_ptr(current, cpu_perf_mask);
+		}
+		else if (unlikely(!strncmp(filename->name,
+					   HWCOMPOSER_BIN_PREFIX,
+					   strlen(HWCOMPOSER_BIN_PREFIX)))) {
+			current->flags |= PF_PERF_CRITICAL;
+			set_cpus_allowed_ptr(current, cpu_perf_mask);
+		}
+		else if (unlikely(!strncmp(filename->name,
+					   GRALLOC_BIN_PREFIX,
+					   strlen(GRALLOC_BIN_PREFIX)))) {
+			current->flags |= PF_PERF_CRITICAL;
+			set_cpus_allowed_ptr(current, cpu_perf_mask);
+		}
+		else if (unlikely(!strcmp(filename->name, PERFD_BIN))) {
 			WRITE_ONCE(perfd_tsk, current);
 		}
 		else if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN))) {
