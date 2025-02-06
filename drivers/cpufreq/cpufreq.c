@@ -2282,6 +2282,9 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 
 	trace_cpu_frequency_limits(policy->max, policy->min, policy->cpu);
 
+	arch_set_min_freq_scale(policy->related_cpus, policy->min,
+				policy->cpuinfo.max_freq);
+
 	policy->cached_target_freq = UINT_MAX;
 
 	pr_debug("new min and max freqs are %u - %u kHz\n",
