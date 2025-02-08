@@ -650,31 +650,6 @@ config ZSMALLOC_STAT
 	  information to userspace via debugfs.
 	  If unsure, say N.
 
-config DIRECT_RECLAIM_FILE_PAGES_ONLY
-	bool "Reclaim file pages only on direct reclaim path"
-	depends on ZSWAP
-	default n
-
-config INCREASE_MAXIMUM_SWAPPINESS
-	bool "Allow swappiness to be set up to 200"
-	depends on ZSWAP
-	default n
-
-config FIX_INACTIVE_RATIO
-	bool "Fix active:inactive anon ratio to 1:1"
-	depends on ZSWAP
-	default n
-
-config SWAP_ENABLE_READAHEAD
-	bool "Enable readahead on page swap in"
-	depends on SWAP
-	default y
-	help
-	  When a page fault occurs, adjacent pages of SWAP_CLUSTER_MAX are
-	  also paged in expecting those pages will be used in near future.
-	  This behaviour is good at disk-based system, but not on in-memory
-	  compression (e.g. zram).
-
 config GENERIC_EARLY_IOREMAP
 	bool
 
@@ -873,15 +848,6 @@ config FORCE_ALLOC_FROM_DMA_ZONE
 	  Ensure certain memory allocators always return memory from ZONE_DMA.
 	  This option helps ensure that clients who require ZONE_DMA memory are
 	  always using ZONE_DMA memory.
-
-	  If unsure, say "n".
-
-config OPLUS_MM_HACKS
-	bool "Enable oplus memory management hacks"
-	default n
-	help
-	  Improves memory management drastically as these hacks are used in Oplus devices.
-	  Tested on devices made by OEMs like Motorola and Samsung.
 
 	  If unsure, say "n".
 
