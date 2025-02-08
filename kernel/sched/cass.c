@@ -61,10 +61,10 @@ void cass_cpu_util(struct cass_cpu_cand *c, int this_cpu, bool sync)
 		c->util -= min(c->util, task_util(current));
 
 	/* Get the utilization of everything other than CFS tasks */
-	c->hard_util = cpu_util_rt(c->cpu) + cpu_util_irq(c->cpu);
+	c->hard_util = cpu_util_rt(c->cpu);
 
 	/*
-	 * Account for lost capacity due to time spent in RT tasks and IRQs.
+	 * Account for lost capacity due to time spent in RT tasks.
 	 * Capacity is considered lost to RT tasks even when @p is an RT task in
 	 * order to produce consistently balanced task placement results between
 	 * CFS and RT tasks when CASS selects a CPU for them.
