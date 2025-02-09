@@ -1855,7 +1855,7 @@ static ssize_t disksize_store(struct device *dev,
 	struct zram *zram = dev_to_zram(dev);
 	int err;
 
-	disksize = (u64)SZ_1G * 4;
+	disksize = (u64)SZ_1G * 2;
 
 	down_write(&zram->init_lock);
 	if (init_done(zram)) {
