@@ -1,6 +1,4 @@
 ccflags-y := -Iinclude/linux
-ccflags-y += $(call cc-option, -funroll-loops,)
-ccflags-y += $(call cc-option, -Ofast,)
 
 msm_kgsl_core-y = \
 	kgsl.o \
