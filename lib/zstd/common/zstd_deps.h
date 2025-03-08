@@ -28,7 +28,6 @@
 
 #include <linux/limits.h>
 #include <linux/stddef.h>
-#include <linux/types.h>
 
 #define ZSTD_memcpy(d,s,n) __builtin_memcpy((d),(s),(n))
 #define ZSTD_memmove(d,s,n) __builtin_memmove((d),(s),(n))
@@ -106,3 +105,17 @@ static uint64_t ZSTD_div64(uint64_t dividend, uint32_t divisor) {
 
 #endif /* ZSTD_DEPS_IO */
 #endif /* ZSTD_DEPS_NEED_IO */
+
+/*
+ * Only requested when MSAN is enabled.
+ * Need:
+ * intptr_t
+ */
+#ifdef ZSTD_DEPS_NEED_STDINT
+#ifndef ZSTD_DEPS_STDINT
+#define ZSTD_DEPS_STDINT
+
+/* intptr_t already provided by ZSTD_DEPS_COMMON */
+
+#endif /* ZSTD_DEPS_STDINT */
+#endif /* ZSTD_DEPS_NEED_STDINT */
