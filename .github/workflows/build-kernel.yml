@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install device-tree-compiler
           export KBUILD_BUILD_USER=mahiroo
           export KBUILD_BUILD_HOST=android-build
-          source build.sh
+          source boled.sh
           echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
 
       - name: Upload standard artifact
