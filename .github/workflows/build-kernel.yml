@@ -1,7 +1,8 @@
 name: Build Kernel
 
 on:
-  push:
+  #push:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,39 +15,27 @@ jobs:
       - name: Setup timezone
         uses: szenius/set-timezone@master
         with:
-          timezoneLinux: "America/Sao_Paulo"
+          timezoneLinux: "Asia/Jakarta"
 
       - name: Run standard build script
         run: |
-          export KBUILD_BUILD_USER=nobody
+          sudo apt-get install device-tree-compiler
+          export KBUILD_BUILD_USER=mahiroo
           export KBUILD_BUILD_HOST=android-build
-          source build.sh
+          source boled.sh
           echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
-
-      - name: Run KSU build script
-        run: |
-          export KBUILD_BUILD_USER=nobody
-          export KBUILD_BUILD_HOST=android-build
-          source build.sh --su
-          echo "ZIPNAME_KSU=${ZIPNAME}" >> $GITHUB_ENV
 
       - name: Upload standard artifact
         uses: actions/upload-artifact@main
         with:
           name: standard-artifact
-          path: ${{ env.ZIPNAME }}
-
-      - name: Upload KSU artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: KSU-artifact
-          path: ${{ env.ZIPNAME_KSU }}
+          path: ${{ env.ZIPNAME }} 
 
       - name: Create Telegram caption
         run: |
           BUILD_DATE="$(date '+%H:%M %d/%m/%Y')"
           HEAD="$(git rev-parse HEAD)"
-          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
+          HEAD_COMMIT="https://github.com/Yuddciel/Oplus/commit/$HEAD"
           echo -e "${BUILD_DATE}\n\n${HEAD_COMMIT}" > caption.txt
 
       - name: Upload standard build to Telegram
@@ -56,9 +45,4 @@ jobs:
           -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
           -F document=@"${{ env.ZIPNAME }}" \
           -F caption="${caption}"
-
-      - name: Upload KSU build to Telegram
-        run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-          -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-          -F document=@"${{ env.ZIPNAME_KSU }}"
+          
