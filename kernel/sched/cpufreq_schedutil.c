@@ -284,7 +284,7 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 		 */
 		freq = policy->cur + (policy->cur >> 2);
 
-	freq = map_util_freq(util, freq, max);
+	freq = (freq + (freq >> 2)) * util / max;
 
 	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;
@@ -330,10 +330,6 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 		rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
 		*util = min(*util + rt, max_cap);
 	}
-
-#ifdef CONFIG_UCLAMP_TASK
-	*util = uclamp_util_with(rq, apply_dvfs_headroom(*util, cpu, true), NULL);
-#endif
 }
 
 static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time)
