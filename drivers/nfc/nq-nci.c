@@ -1500,17 +1500,21 @@ err_class_create:
 err_char_dev_register:
 	mutex_destroy(&nqx_dev->read_mutex);
 err_clkreq_gpio:
-	gpio_free(platform_data->clkreq_gpio);
+	if (gpio_is_valid(platform_data->clkreq_gpio))
+		gpio_free(platform_data->clkreq_gpio);
 err_ese_gpio:
 	/* optional gpio, not sure was configured in probe */
 	if (nqx_dev->ese_gpio > 0)
 		gpio_free(platform_data->ese_gpio);
 err_firm_gpio:
-	gpio_free(platform_data->firm_gpio);
+	if (gpio_is_valid(platform_data->firm_gpio))
+		gpio_free(platform_data->firm_gpio);
 err_irq_gpio:
-	gpio_free(platform_data->irq_gpio);
+	if (gpio_is_valid(platform_data->irq_gpio))
+		gpio_free(platform_data->irq_gpio);
 err_en_gpio:
-	gpio_free(platform_data->en_gpio);
+	if (gpio_is_valid(platform_data->en_gpio))
+		gpio_free(platform_data->en_gpio);
 err_mem:
 	kfree(nqx_dev->kbuf);
 err_free_dev:
