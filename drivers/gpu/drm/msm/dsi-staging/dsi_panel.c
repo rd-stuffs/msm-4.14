@@ -2341,9 +2341,10 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 	rc = utils->read_u32(utils->data,
 			"qcom,mdss-dsi-bl-default-level", &val);
 	if (rc) {
+		pr_debug("[%s] bl-default-level unspecified, defaulting to 15% max level\n",
+			panel->name);
 		panel->bl_config.brightness_default_level =
-			panel->bl_config.brightness_max_level;
-		pr_debug("set default brightness to max level\n");
+			(panel->bl_config.brightness_max_level * 15) / 100;
 	} else {
 		panel->bl_config.brightness_default_level = val;
 	}
