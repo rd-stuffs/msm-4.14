@@ -626,6 +626,18 @@ do {										\
 	__ret;									\
 })
 
+#define __wait_event_freezable_state_exclusive(wq, condition, state)		\
+	___wait_event(wq, condition, state, 1, 0, freezable_schedule())
+
+#define wait_event_freezable_state_exclusive(wq, condition, state)		\
+({										\
+	int __ret = 0;								\
+	might_sleep();								\
+	if (!(condition))							\
+		__ret = __wait_event_freezable_state_exclusive(wq, condition, state); \
+	__ret;									\
+})
+
 extern int do_wait_intr(wait_queue_head_t *, wait_queue_entry_t *);
 extern int do_wait_intr_irq(wait_queue_head_t *, wait_queue_entry_t *);
 
