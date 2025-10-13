@@ -529,7 +529,7 @@ static int _iommu_map_sg_sync_pc(struct kgsl_pagetable *pt,
 		unsigned int flags)
 {
 	struct kgsl_iommu_pt *iommu_pt = pt->priv;
-	size_t mapped;
+	ssize_t mapped;
 
 	_iommu_sync_mmu_pc(true);
 
@@ -537,10 +537,10 @@ static int _iommu_map_sg_sync_pc(struct kgsl_pagetable *pt,
 
 	_iommu_sync_mmu_pc(false);
 
-	if (mapped == 0) {
+	if (mapped <= 0) {
 		KGSL_CORE_ERR("map sg err: 0x%016llX, %d, %x, %zd\n",
 			addr, nents, flags, mapped);
-		return  -ENODEV;
+		return mapped ? (int)mapped : -ENODEV;
 	}
 
 	return 0;
