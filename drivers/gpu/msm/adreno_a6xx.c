@@ -3113,6 +3113,9 @@ static int a6xx_perfcounter_update(struct adreno_device *adreno_dev,
 	struct cpu_gpu_lock *lock = adreno_dev->pwrup_reglist.hostptr;
 	struct reg_list_pair *reg_pair = (struct reg_list_pair *)(lock + 1);
 	unsigned int i;
+	unsigned int max_entries =
+		(PAGE_SIZE - sizeof(*lock)) / sizeof(*reg_pair);
+	unsigned int list_count;
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
 	int ret = 0;
 
@@ -3145,12 +3148,19 @@ static int a6xx_perfcounter_update(struct adreno_device *adreno_dev,
 
 	/* Read flag_ucode and turn before list_length */
 	rmb();
+
+	list_count = lock->list_length >> 1;
+	if (list_count > max_entries) {
+		ret = -ERANGE;
+		goto unlock;
+	}
+
 	/*
 	 * If the perfcounter select register is already present in reglist
 	 * update it, otherwise append the <select register, value> pair to
 	 * the end of the list.
 	 */
-	for (i = 0; i < lock->list_length >> 1; i++)
+	for (i = 0; i < list_count; i++)
 		if (reg_pair[i].offset == reg->select)
 			break;
 	/*
@@ -3158,7 +3168,11 @@ static int a6xx_perfcounter_update(struct adreno_device *adreno_dev,
 	 * with new entry and add RBBM perf counter enable at the end.
 	 */
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_PERFCTRL_RETAIN) &&
-			(i == lock->list_length >> 1)) {
+			(i == list_count) && (i > 0)) {
+		if (i >= max_entries) {
+			ret = -ENOSPC;
+			goto unlock;
+		}
 		reg_pair[i-1].offset = reg->select;
 		reg_pair[i-1].val = reg->countable;
 
@@ -3167,6 +3181,10 @@ static int a6xx_perfcounter_update(struct adreno_device *adreno_dev,
 		reg_pair[i].val = 1;
 
 	} else {
+		if (i >= max_entries) {
+			ret = -ENOSPC;
+			goto unlock;
+		}
 		/*
 		 * If perf counter select register is already present in reglist
 		 * just update list without adding the RBBM perfcontrol enable.
@@ -3175,7 +3193,7 @@ static int a6xx_perfcounter_update(struct adreno_device *adreno_dev,
 		reg_pair[i].val = reg->countable;
 	}
 
-	if (i == lock->list_length >> 1)
+	if (i == list_count)
 		lock->list_length += 2;
 
 	if (update_reg)
