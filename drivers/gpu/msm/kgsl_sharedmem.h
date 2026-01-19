@@ -1,4 +1,5 @@
 /* Copyright (c) 2002,2007-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -93,7 +94,7 @@ struct page *kgsl_alloc_secure_page(void);
  *
  * Returns the alignment requested, as power of 2 exponent.
  */
-static inline int
+static inline u32
 kgsl_memdesc_get_align(const struct kgsl_memdesc *memdesc)
 {
 	return MEMFLAGS(memdesc->flags, KGSL_MEMALIGN_MASK,
@@ -106,10 +107,10 @@ kgsl_memdesc_get_align(const struct kgsl_memdesc *memdesc)
  *
  * Returns the pagesize based on memdesc alignment
  */
-static inline int
+static inline unsigned int
 kgsl_memdesc_get_pagesize(const struct kgsl_memdesc *memdesc)
 {
-	return (1 << kgsl_memdesc_get_align(memdesc));
+	return (1U << kgsl_memdesc_get_align(memdesc));
 }
 
 /*
