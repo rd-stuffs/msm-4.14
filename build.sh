@@ -5,7 +5,7 @@
 
 SECONDS=0
 ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
-LLVM_REV="20"
+LLVM_REV="22"
 TC_DIR="$(pwd)/tc/clang-$LLVM_REV"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="surya_defconfig"
