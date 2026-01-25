@@ -3,9 +3,10 @@
 # Compile script for FSociety kernel
 # Copyright (C) 2020-2021 Adithya R.
 
-SECONDS=0 # builtin bash timer
+SECONDS=0
 ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-20"
+LLVM_REV="20"
+TC_DIR="$(pwd)/tc/clang-$LLVM_REV"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="surya_defconfig"
 
@@ -16,59 +17,20 @@ fi
 
 export PATH="$TC_DIR/bin:$PATH"
 
-sync_repo() {
-    local dir=$1
-    local repo_url=$2
-    local branch=$3
-	local update=$4
-
-    if [ -d "$dir" ]; then
-        if $update; then
-			# Fetch the latest changes
-            git -C "$dir" fetch origin --quiet
-
-            # Compare local and remote commits
-            LOCAL_COMMIT=$(git -C "$dir" rev-parse HEAD)
-            REMOTE_COMMIT=$(git -C "$dir" rev-parse "origin/$branch")
-
-            # If there are changes, reset and log the update
-            if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
-                git -C "$dir" reset --quiet --hard "origin/$branch"
-                LATEST_COMMIT=$(git -C "$dir" log -1 --oneline)
-                echo -e "Updated $repo_url to: $LATEST_COMMIT\n" | tee -a "$dir/updates.txt"
-            else
-                echo "No changes found for $repo_url. Skipping update."
-            fi
-        fi
-    else
-        # Clone the repository if it doesn't exist
-        echo "Cloning $repo_url to $dir..."
-        if ! git clone --quiet --depth=1 -b "$branch" "$repo_url" "$dir"; then
-            echo "Cloning failed! Aborting..."
-            exit 1
-        fi
-    fi
-}
-
-if [[ $1 = "-u" || $1 = "--update" ]]; then
-    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" true
-    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "20" true
-	exit
-else
-    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" false
-    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "20" false
+if ! [ -d "$TC_DIR" ]; then
+	echo "Slim LLVM not found! Cloning to $TC_DIR..."
+	if ! git clone --depth=1 -b $LLVM_REV https://bitbucket.org/rdxzv/clang-standalone.git "$TC_DIR"; then
+		echo "Cloning failed! Aborting..."
+		exit 1
+	fi
 fi
 
-if [ ! -d "$AK3_DIR" ] || [ ! -d "$TC_DIR" ]; then
-    echo "Error: Required directories are missing. Aborting the build process."
-    exit 1
-fi
-
-if [[ $1 = "-r" || $1 = "--regen" ]]; then
-	make $DEFCONFIG savedefconfig
-	cp out/defconfig arch/arm64/configs/$DEFCONFIG
-	echo -e "\nSuccessfully regenerated defconfig at $DEFCONFIG"
-	exit
+if ! [ -d "$AK3_DIR" ]; then
+	echo "AnyKernel3 not found! Cloning to $AK3_DIR..."
+	if ! git clone --depth=1 -b FSociety https://github.com/rd-stuffs/AnyKernel3.git "$AK3_DIR"; then
+		echo "Cloning failed! Aborting..."
+		exit 1
+	fi
 fi
 
 if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
@@ -78,17 +40,16 @@ if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
 	exit
 fi
 
-CLEAN_BUILD=false
-ENABLE_KSU=false
+CLEAN=false
+KSU=false
 
 for arg in "$@"; do
 	case $arg in
 		-c|--clean)
-			CLEAN_BUILD=true
+			CLEAN=true
 			;;
 		-s|--su)
-			ENABLE_KSU=true
-			ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+			KSU=true
 			;;
 		*)
 			echo "Unknown argument: $arg"
@@ -97,26 +58,20 @@ for arg in "$@"; do
 	esac
 done
 
-if $CLEAN_BUILD; then
-	echo "Cleaning output directory..."
+if [[ "$CLEAN" = true ]]; then
 	rm -rf out
 fi
 
-if $ENABLE_KSU; then
-	echo "Building with KSU support..."
-	KSU_DEFCONFIG="ksu_${DEFCONFIG}"
-	KSU_DEFCONFIG_PATH="arch/arm64/configs/${KSU_DEFCONFIG}"
-	cp arch/arm64/configs/$DEFCONFIG $KSU_DEFCONFIG_PATH
-	sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' $KSU_DEFCONFIG_PATH
-	trap '[[ -f $KSU_DEFCONFIG_PATH ]] && rm -f $KSU_DEFCONFIG_PATH' EXIT
+echo -e "\nStarting compilation...\n"
+make $DEFCONFIG
+
+if [[ "$KSU" = true ]]; then
+	echo -e "\nBuilding with KernelSU support...\n"
+	ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+	scripts/config --file out/.config -e KSU -e KSU_MANUAL_HOOK
+	make olddefconfig
 fi
 
-echo -e "\nStarting compilation...\n"
-if $ENABLE_KSU; then
-	make $KSU_DEFCONFIG
-else
-	make $DEFCONFIG
-fi
 make -j$(nproc --all) LLVM=1 Image.gz dtb.img dtbo.img 2> >(tee log.txt >&2) || exit $?
 
 kernel="out/arch/arm64/boot/Image.gz"
