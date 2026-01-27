@@ -18,16 +18,6 @@ static inline struct timespec current_kernel_time(void)
 	return timespec64_to_timespec(ts64);
 }
 
-
-static inline int __getnstimeofday(struct timespec *ts)
-{
-	struct timespec64 ts64;
-	int ret = __getnstimeofday64(&ts64);
-
-	*ts = timespec64_to_timespec(ts64);
-	return ret;
-}
-
 #if BITS_PER_LONG == 64
 /**
  * Deprecated. Use do_settimeofday64().
@@ -82,7 +72,7 @@ static inline void getnstimeofday(struct timespec *ts)
 {
 	struct timespec64 ts64;
 
-	getnstimeofday64(&ts64);
+	ktime_get_real_ts64(&ts64);
 	*ts = timespec64_to_timespec(ts64);
 }
 
@@ -98,7 +88,7 @@ static inline void ktime_get_real_ts(struct timespec *ts)
 {
 	struct timespec64 ts64;
 
-	getnstimeofday64(&ts64);
+	ktime_get_real_ts64(&ts64);
 	*ts = timespec64_to_timespec(ts64);
 }
 
