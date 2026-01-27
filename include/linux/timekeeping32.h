@@ -18,55 +18,6 @@ static inline struct timespec current_kernel_time(void)
 	return timespec64_to_timespec(ts64);
 }
 
-
-static inline int __getnstimeofday(struct timespec *ts)
-{
-	struct timespec64 ts64;
-	int ret = __getnstimeofday64(&ts64);
-
-	*ts = timespec64_to_timespec(ts64);
-	return ret;
-}
-
-#if BITS_PER_LONG == 64
-/**
- * Deprecated. Use do_settimeofday64().
- */
-static inline int do_settimeofday(const struct timespec *ts)
-{
-	return do_settimeofday64(ts);
-}
-
-static inline void getnstimeofday(struct timespec *ts)
-{
-	getnstimeofday64(ts);
-}
-
-static inline void ktime_get_ts(struct timespec *ts)
-{
-	ktime_get_ts64(ts);
-}
-
-static inline void ktime_get_real_ts(struct timespec *ts)
-{
-	getnstimeofday64(ts);
-}
-
-static inline void getrawmonotonic(struct timespec *ts)
-{
-	getrawmonotonic64(ts);
-}
-
-static inline struct timespec get_monotonic_coarse(void)
-{
-	return get_monotonic_coarse64();
-}
-
-static inline void getboottime(struct timespec *ts)
-{
-	return getboottime64(ts);
-}
-#else
 /**
  * Deprecated. Use do_settimeofday64().
  */
@@ -82,7 +33,7 @@ static inline void getnstimeofday(struct timespec *ts)
 {
 	struct timespec64 ts64;
 
-	getnstimeofday64(&ts64);
+	ktime_get_real_ts64(&ts64);
 	*ts = timespec64_to_timespec(ts64);
 }
 
@@ -98,7 +49,7 @@ static inline void ktime_get_real_ts(struct timespec *ts)
 {
 	struct timespec64 ts64;
 
-	getnstimeofday64(&ts64);
+	ktime_get_real_ts64(&ts64);
 	*ts = timespec64_to_timespec(ts64);
 }
 
@@ -126,7 +77,6 @@ static inline void getboottime(struct timespec *ts)
 	getboottime64(&ts64);
 	*ts = timespec64_to_timespec(ts64);
 }
-#endif
 
 /*
  * Timespec interfaces utilizing the ktime based ones

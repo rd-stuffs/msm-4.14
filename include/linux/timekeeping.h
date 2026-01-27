@@ -36,14 +36,6 @@ void getboottime64(struct timespec64 *ts);
  */
 extern time64_t ktime_get_seconds(void);
 extern time64_t ktime_get_real_seconds(void);
-extern time64_t ktime_get_seconds(void);
-extern time64_t ktime_get_real_seconds(void);
-
-extern int __getnstimeofday64(struct timespec64 *tv);
-extern void getnstimeofday64(struct timespec64 *tv);
-extern void getboottime64(struct timespec64 *ts);
-
-#define ktime_get_real_ts64(ts)	getnstimeofday64(ts)
 
 /*
  * ktime_t based interfaces
@@ -58,6 +50,7 @@ enum tk_offsets {
 
 extern ktime_t ktime_get(void);
 extern ktime_t ktime_get_with_offset(enum tk_offsets offs);
+extern ktime_t ktime_get_coarse_with_offset(enum tk_offsets offs);
 extern ktime_t ktime_mono_to_any(ktime_t tmono, enum tk_offsets offs);
 extern ktime_t ktime_get_raw(void);
 extern u32 ktime_get_resolution_ns(void);
@@ -68,6 +61,11 @@ extern u32 ktime_get_resolution_ns(void);
 static inline ktime_t ktime_get_real(void)
 {
 	return ktime_get_with_offset(TK_OFFS_REAL);
+}
+
+static inline ktime_t ktime_get_coarse_real(void)
+{
+	return ktime_get_coarse_with_offset(TK_OFFS_REAL);
 }
 
 /**
@@ -81,12 +79,22 @@ static inline ktime_t ktime_get_boottime(void)
 	return ktime_get_with_offset(TK_OFFS_BOOT);
 }
 
+static inline ktime_t ktime_get_coarse_boottime(void)
+{
+	return ktime_get_coarse_with_offset(TK_OFFS_BOOT);
+}
+
 /**
  * ktime_get_clocktai - Returns the TAI time of day in ktime_t format
  */
 static inline ktime_t ktime_get_clocktai(void)
 {
 	return ktime_get_with_offset(TK_OFFS_TAI);
+}
+
+static inline ktime_t ktime_get_coarse_clocktai(void)
+{
+	return ktime_get_coarse_with_offset(TK_OFFS_TAI);
 }
 
 /**
@@ -107,12 +115,12 @@ static inline u64 ktime_get_real_ns(void)
 	return ktime_to_ns(ktime_get_real());
 }
 
-static inline u64 ktime_get_boot_ns(void)
+static inline u64 ktime_get_boottime_ns(void)
 {
 	return ktime_to_ns(ktime_get_boottime());
 }
 
-static inline u64 ktime_get_tai_ns(void)
+static inline u64 ktime_get_clocktai_ns(void)
 {
 	return ktime_to_ns(ktime_get_clocktai());
 }
@@ -125,6 +133,7 @@ static inline u64 ktime_get_raw_ns(void)
 extern u64 ktime_get_mono_fast_ns(void);
 extern u64 ktime_get_raw_fast_ns(void);
 extern u64 ktime_get_boot_fast_ns(void);
+extern u64 ktime_get_real_fast_ns(void);
 
 /*
  * timespec64 interfaces utilizing the ktime based ones
@@ -222,6 +231,10 @@ extern int update_persistent_clock64(struct timespec64 now);
 
 s64 get_total_sleep_time_nsec(void);
 
+/*
+ * deprecated aliases, don't use in new code
+ */
+#define getnstimeofday64(ts)		ktime_get_real_ts64(ts)
 #define get_monotonic_boottime64(ts)	ktime_get_boottime_ts64(ts)
 #define getrawmonotonic64(ts)		ktime_get_raw_ts64(ts)
 #define timekeeping_clocktai64(ts)	ktime_get_clocktai_ts64(ts)
