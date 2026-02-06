@@ -946,7 +946,7 @@ static void qrtr_fwd_ctrl_pkt(struct sk_buff *skb)
 		if (!qrtr_must_forward(src, node, cb->type))
 			continue;
 
-		skbn = skb_clone(skb, GFP_KERNEL);
+		skbn = pskb_copy(skb, GFP_KERNEL);
 		if (!skbn)
 			break;
 
@@ -1312,7 +1312,7 @@ static void qrtr_send_del_client(struct qrtr_sock *ipc)
 		if (!node)
 			goto exit;
 
-		skbn = skb_clone(skb, GFP_KERNEL);
+		skbn = pskb_copy(skb, GFP_KERNEL);
 		if (!skbn) {
 			qrtr_node_release(node);
 			goto exit;
@@ -1544,7 +1544,7 @@ static int qrtr_bcast_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 	list_for_each_entry(node, &qrtr_all_epts, item) {
 		if (node->nid == QRTR_EP_NID_AUTO && type != QRTR_TYPE_HELLO)
 			continue;
-		skbn = skb_clone(skb, GFP_KERNEL);
+		skbn = pskb_copy(skb, GFP_KERNEL);
 		if (!skbn)
 			break;
 		skb_set_owner_w(skbn, skb->sk);
