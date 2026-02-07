@@ -2,12 +2,16 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
+#include <linux/device.h>
 
 bool capacitive_keys_enabled;
 struct kobject *touchpanel_kobj;
 
 static struct tp_common_ops *double_tap_ops;
 static struct proc_dir_entry *tp_gesture_proc;
+
+static struct class *touch_class;
+static struct device *touch_dev;
 
 #define TS_ENABLE_FOPS(type)                                                   \
 	int tp_common_set_##type##_ops(struct tp_common_ops *ops)              \
@@ -69,8 +73,33 @@ static const struct file_operations tp_gesture_proc_ops = {
 	.write   = tp_gesture_proc_write,
 };
 
+static ssize_t double_tap_dev_show(struct device *dev,
+				   struct device_attribute *attr,
+				   char *buf)
+{
+	if (!double_tap_ops || !double_tap_ops->show)
+		return -EINVAL;
+
+	return double_tap_ops->show(NULL, NULL, buf);
+}
+
+static ssize_t double_tap_dev_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	if (!double_tap_ops || !double_tap_ops->store)
+		return -EINVAL;
+
+	return double_tap_ops->store(NULL, NULL, buf, count);
+}
+
+static DEVICE_ATTR(double_tap, 0664,
+		   double_tap_dev_show,
+		   double_tap_dev_store);
+
 int tp_common_set_double_tap_ops(struct tp_common_ops *ops)
 {
+	int ret;
 	static struct kobj_attribute kattr =
 		__ATTR(double_tap, (S_IWUSR | S_IRUGO), NULL, NULL);
 
@@ -90,6 +119,12 @@ int tp_common_set_double_tap_ops(struct tp_common_ops *ops)
 			return -ENOMEM;
 	}
 
+	if (touch_dev) {
+		ret = device_create_file(touch_dev, &dev_attr_double_tap);
+		if (ret)
+			return ret;
+	}
+
 	return sysfs_create_file(touchpanel_kobj, &kattr.attr);
 }
 
@@ -98,6 +133,16 @@ static int __init tp_common_init(void)
 	touchpanel_kobj = kobject_create_and_add("touchpanel", NULL);
 	if (!touchpanel_kobj)
 		return -ENOMEM;
+
+	touch_class = class_create(THIS_MODULE, "touch");
+	if (IS_ERR(touch_class))
+		return PTR_ERR(touch_class);
+
+	touch_dev = device_create(touch_class, NULL, 0, NULL, "touch_dev");
+	if (IS_ERR(touch_dev)) {
+		class_destroy(touch_class);
+		return PTR_ERR(touch_dev);
+	}
 
 	return 0;
 }
