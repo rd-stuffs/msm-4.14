@@ -142,6 +142,7 @@
 		reg-names = "qusb_phy_base", "efuse_addr",
 				"refgen_north_bg_reg_addr";
 
+		mi,no-efuse-tune;
 		qcom,efuse-bit-pos = <25>;
 		qcom,efuse-num-bits = <3>;
 		vdd-supply = <&pm6150_l4>;
