@@ -130,10 +130,12 @@ static int lpm_drm_notify(struct notifier_block *nb,
 	switch (blank) {
 	case MSM_DRM_BLANK_UNBLANK:
 		sleep_disabled = true;
+		lpm_cluster_use_deepest_state(false);
 		wake_up_all_idle_cpus();
 		break;
 	case MSM_DRM_BLANK_POWERDOWN:
 		sleep_disabled = false;
+		lpm_cluster_use_deepest_state(true);
 		wake_up_all_idle_cpus();
 		break;
 	default:
