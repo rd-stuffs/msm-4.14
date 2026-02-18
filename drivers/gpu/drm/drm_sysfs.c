@@ -231,47 +231,43 @@ static ssize_t modes_show(struct device *device,
 }
 
 
-extern int drm_get_panel_info(struct drm_bridge *bridge, char *name);
 static ssize_t panel_info_show(struct device *device,
-			    struct device_attribute *attr,
-			   char *buf)
+			      struct device_attribute *attr,
+			      char *buf)
 {
-	int written = 0;
+	struct drm_connector *connector;
+	struct drm_encoder *encoder;
+	struct drm_bridge *bridge;
 	char pname[128] = {0};
-	struct drm_connector *connector = NULL;
-	struct drm_encoder *encoder = NULL;
-	struct drm_bridge *bridge = NULL;
+	int written = 0;
 
 	connector = to_drm_connector(device);
 	if (!connector)
-		return written;
+		return 0;
 
 	encoder = connector->encoder;
 	if (!encoder)
-		return written;
+		return 0;
 
 	bridge = encoder->bridge;
 	if (!bridge)
-		return written;
+		return 0;
 
 	written = drm_get_panel_info(bridge, pname);
 	if (written)
 		return snprintf(buf, PAGE_SIZE, "panel_name=%s\n", pname);
 
-	return written;
+	return 0;
 }
 
-
-
-void drm_bridge_disp_param_set(struct drm_bridge *bridge, int cmd);
 static ssize_t disp_param_store(struct device *device,
-			   struct device_attribute *attr,
-			   const char *buf, size_t count)
+				struct device_attribute *attr,
+				const char *buf, size_t count)
 {
+	struct drm_connector *connector;
+	struct drm_encoder *encoder;
+	struct drm_bridge *bridge;
 	int param;
-	struct drm_connector *connector = NULL;
-	struct drm_encoder *encoder = NULL;
-	struct drm_bridge *bridge = NULL;
 
 	if (!device)
 		return count;
@@ -287,38 +283,37 @@ static ssize_t disp_param_store(struct device *device,
 	bridge = encoder->bridge;
 	if (!bridge)
 		return count;
-	sscanf(buf, "0x%x", &param);
+
+	if (sscanf(buf, "0x%x", &param) != 1)
+		return -EINVAL;
 
 	drm_bridge_disp_param_set(bridge, param);
 
 	return count;
 }
 
-ssize_t drm_bridge_disp_param_get(struct drm_bridge *bridge, char *pbuf);
 static ssize_t disp_param_show(struct device *device,
-			   struct device_attribute *attr,
-   			   char *buf)
+			       struct device_attribute *attr,
+			       char *buf)
 {
-   	ssize_t ret = 0;
-	struct drm_connector *connector = NULL;
-	struct drm_encoder *encoder = NULL;
-	struct drm_bridge *bridge = NULL;
+	struct drm_connector *connector;
+	struct drm_encoder *encoder;
+	struct drm_bridge *bridge;
 
 	connector = to_drm_connector(device);
 	if (!connector)
-		return ret;
+		return 0;
 
 	encoder = connector->encoder;
 	if (!encoder)
-		return ret;
+		return 0;
 
 	bridge = encoder->bridge;
 	if (!bridge)
-		return ret;
-	ret = drm_bridge_disp_param_get(bridge, buf);
-	return ret;
-}
+		return 0;
 
+	return drm_bridge_disp_param_get(bridge, buf);
+}
 
 static DEVICE_ATTR_RW(status);
 static DEVICE_ATTR_RO(enabled);

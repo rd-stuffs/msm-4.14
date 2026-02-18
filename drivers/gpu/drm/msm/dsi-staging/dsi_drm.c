@@ -294,10 +294,11 @@ int dsi_bridge_interface_enable(int timeout)
 EXPORT_SYMBOL(dsi_bridge_interface_enable);
 
 int panel_disp_param_send(struct dsi_display *display, int cmd);
+
 static void dsi_bridge_disp_param_set(struct drm_bridge *bridge, int cmd)
 {
-	int rc = 0;
 	struct dsi_bridge *c_bridge;
+	int rc = 0;
 
 	if (!bridge) {
 		pr_err("Invalid params\n");
@@ -325,40 +326,40 @@ static ssize_t dsi_bridge_disp_param_get(struct drm_bridge *bridge, char *buf)
 	if (!bridge) {
 		pr_err("Invalid params\n");
 		return 0;
-	} else {
-		SDE_ATRACE_BEGIN("panel_disp_param_get");
-		c_bridge = to_dsi_bridge(bridge);
-		if(c_bridge == NULL)
-			return 0;
-		display = c_bridge->display;
-		if(display == NULL)
-			return 0;
-		panel = display->panel;
-		if (panel) {
-			ret = strlen(panel->panel_read_data);
-			ret = ret > 255 ? 255 : ret;
-			if (ret > 0)
-				memcpy(buf, panel->panel_read_data, ret);
-		}
-		SDE_ATRACE_END("panel_disp_param_get");
 	}
+
+	SDE_ATRACE_BEGIN("panel_disp_param_get");
+	c_bridge = to_dsi_bridge(bridge);
+	if (!c_bridge || !c_bridge->display)
+		goto exit;
+
+	display = c_bridge->display;
+	panel = display->panel;
+	if (panel) {
+		ret = strlen(panel->panel_read_data);
+		if (ret > 255)
+			ret = 255;
+		if (ret > 0)
+			memcpy(buf, panel->panel_read_data, ret);
+	}
+exit:
+	SDE_ATRACE_END("panel_disp_param_get");
 	return ret;
 }
 
 static int dsi_bridge_get_panel_info(struct drm_bridge *bridge, char *buf)
 {
-	int rc = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
 
-	if (!c_bridge) {
+	if (!c_bridge || !c_bridge->display) {
 		pr_err("Invalid params\n");
-		return rc;
+		return 0;
 	}
 
 	if (c_bridge->display->name)
-		return snprintf(buf, PAGE_SIZE, c_bridge->display->name);
+		return snprintf(buf, PAGE_SIZE, "%s", c_bridge->display->name);
 
-	return rc;
+	return 0;
 }
 
 static void dsi_bridge_enable(struct drm_bridge *bridge)

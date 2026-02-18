@@ -47,7 +47,6 @@
 
 DEFINE_MUTEX(dsi_display_clk_mutex);
 
-char g_lcd_id[128];
 static char dsi_display_primary[MAX_CMDLINE_PARAM_LEN];
 static char dsi_display_secondary[MAX_CMDLINE_PARAM_LEN];
 static struct dsi_display_boot_param boot_displays[MAX_DSI_ACTIVE_DISPLAY] = {
@@ -860,36 +859,31 @@ release_panel_lock:
 
 int dsi_display_read_panel(struct dsi_panel *panel, struct dsi_read_config *read_config)
 {
-	struct mipi_dsi_host *host;
 	struct dsi_display *display;
 	struct dsi_display_ctrl *ctrl;
 	struct dsi_cmd_desc *cmds;
-	int i, rc = 0, count = 0;
 	u32 flags = 0;
+	int rc = 0;
 
-	if (panel == NULL || read_config == NULL)
+	if (!panel || !read_config || !panel->host)
 		return -EINVAL;
 
-	host = panel->host;
-	if (host) {
-		display = to_dsi_display(host);
-		if (display == NULL)
-			return -EINVAL;
-	} else
+	display = to_dsi_display(panel->host);
+	if (!display)
 		return -EINVAL;
 
 	if (!panel->panel_initialized) {
-		pr_info("Panel not initialized\n");
+		pr_err("Panel not initialized\n");
 		return -EINVAL;
 	}
 
 	if (!read_config->enabled) {
-		pr_info("read operation was not permitted\n");
+		pr_err("read operation not permitted\n");
 		return -EPERM;
 	}
 
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
-		DSI_ALL_CLKS, DSI_CLK_ON);
+			     DSI_ALL_CLKS, DSI_CLK_ON);
 
 	ctrl = &display->ctrl[display->cmd_master_idx];
 
@@ -897,18 +891,17 @@ int dsi_display_read_panel(struct dsi_panel *panel, struct dsi_read_config *read
 	if (rc) {
 		pr_err("cmd engine enable failed\n");
 		rc = -EPERM;
-		goto exit_ctrl;
+		goto exit_clk;
 	}
 
-	if (display->tx_cmd_buf == NULL) {
+	if (!display->tx_cmd_buf) {
 		rc = dsi_host_alloc_cmd_tx_buffer(display);
 		if (rc) {
 			pr_err("failed to allocate cmd tx buffer memory\n");
-			goto exit;
+			goto exit_engine;
 		}
 	}
 
-	count = read_config->read_cmd.count;
 	cmds = read_config->read_cmd.cmds;
 	if (cmds->last_command) {
 		cmds->msg.flags |= MIPI_DSI_MSG_LASTCOMMAND;
@@ -916,25 +909,21 @@ int dsi_display_read_panel(struct dsi_panel *panel, struct dsi_read_config *read
 	}
 	flags |= (DSI_CTRL_CMD_FETCH_MEMORY | DSI_CTRL_CMD_READ);
 
-	memset(read_config->rbuf, 0x0, sizeof(read_config->rbuf));
+	memset(read_config->rbuf, 0, sizeof(read_config->rbuf));
 	cmds->msg.rx_buf = read_config->rbuf;
 	cmds->msg.rx_len = read_config->cmds_rlen;
 
-	rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &(cmds->msg), flags);
+	rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &cmds->msg, flags);
 	if (rc <= 0) {
 		pr_err("rx cmd transfer failed rc=%d\n", rc);
-		goto exit;
+		goto exit_engine;
 	}
 
-	for (i = 0; i < read_config->cmds_rlen; i++) //debug
-		pr_info("0x%x ", read_config->rbuf[i]);
-	pr_info("\n");
-
-exit:
+exit_engine:
 	dsi_display_cmd_engine_disable(display);
-exit_ctrl:
+exit_clk:
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
-		DSI_ALL_CLKS, DSI_CLK_OFF);
+			     DSI_ALL_CLKS, DSI_CLK_OFF);
 
 	return rc;
 }
