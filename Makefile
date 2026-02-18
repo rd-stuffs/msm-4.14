@@ -752,20 +752,18 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning, address-of-packed-member)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, attribute-alias)
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS   += -Os
-KBUILD_AFLAGS   += -Os
-KBUILD_LDFLAGS  += -Os
+KBUILD_CFLAGS	+= -Os
+KBUILD_AFLAGS	+= -Os
+KBUILD_LDFLAGS	+= -Os
 else
 ifeq ($(cc-name),clang)
-KBUILD_CFLAGS   += -mllvm -hot-cold-split=true
-KBUILD_CFLAGS   += -mcpu=cortex-a55 -mtune=cortex-a55
-KBUILD_CFLAGS   += -O3 -march=armv8.2-a+lse+crypto+dotprod+crc --cuda-path=/dev/null
-KBUILD_AFLAGS   += -O3 -march=armv8.2-a+lse+crypto+dotprod+crc
-KBUILD_LDFLAGS  += -O3 --plugin-opt=O3
+KBUILD_CFLAGS	+= -O3
+KBUILD_CFLAGS	+= -ffp-contract=fast
+KBUILD_CFLAGS	+= -mllvm -hot-cold-split=true
 else
-KBUILD_CFLAGS   += -O2
-KBUILD_AFLAGS   += -O2
-KBUILD_LDFLAGS  += -O2
+KBUILD_CFLAGS	+= -O2
+KBUILD_AFLAGS	+= -O2
+KBUILD_LDFLAGS	+= -O2
 ifdef CONFIG_INLINE_OPTIMIZATION
 KBUILD_CFLAGS	+= -mllvm -inline-threshold=2500
 KBUILD_CFLAGS	+= -mllvm -inlinehint-threshold=2000
@@ -863,6 +861,12 @@ endif
 # Use make W=1 to enable them (see scripts/Makefile.extrawarn)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 
+ifeq ($(cc-name),clang)
+KBUILD_AFLAGS	+= -march=armv8.2-a+crypto+crc+lse+fp16+dotprod+rcpc
+KBUILD_CFLAGS	+= -march=armv8.2-a+crypto+crc+lse+fp16+dotprod+rcpc
+KBUILD_CFLAGS	+= -mtune=cortex-a76
+endif
+
 ifdef CONFIG_LTO_CLANG
 KBUILD_LDFLAGS += -O3 --lto-O3 --strip-debug
 else
@@ -959,20 +963,21 @@ endif
 
 ifdef CONFIG_LTO_CLANG
 ifdef CONFIG_THINLTO
-lto-clang-flags	:= -flto=thin -fsplit-lto-unit -funified-lto
-LDFLAGS		+= --thinlto-cache-dir=.thinlto-cache --thinlto-jobs=$(nproc --all)
+lto-clang-flags	:= -flto=thin
+lto-clang-flags	+= -funified-lto
+KBUILD_LDFLAGS	+= --thinlto-cache-dir=.thinlto-cache
+KBUILD_LDFLAGS	+= --thinlto-jobs=$(shell nproc --all)
 else
 lto-clang-flags	:= -flto
 endif
-lto-clang-flags += -fvisibility=hidden -fsplit-machine-functions
-
-# Limit inlining across translation units to reduce binary size
-KBUILD_LDFLAGS += -mllvm -import-instr-limit=40
+lto-clang-flags	+= -fvisibility=hidden
+lto-clang-flags	+= -fwhole-program-vtables
+lto-clang-flags	+= -fsplit-machine-functions
 
 KBUILD_LDFLAGS_MODULE += -T scripts/module-lto.lds
 
 # allow disabling only clang LTO where needed
-DISABLE_LTO_CLANG := -fno-lto
+DISABLE_LTO_CLANG := -fno-lto -fno-whole-program-vtables
 export DISABLE_LTO_CLANG
 endif
 
