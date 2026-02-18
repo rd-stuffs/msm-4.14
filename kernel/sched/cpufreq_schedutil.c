@@ -105,15 +105,11 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 	if (!cpufreq_can_do_remote_dvfs(sg_policy->policy))
 		return false;
 
-	if (unlikely(sg_policy->limits_changed)) {
-		sg_policy->limits_changed = false;
-		sg_policy->need_freq_update = cpufreq_driver_test_flags(CPUFREQ_NEED_UPDATE_LIMITS);
+	if (unlikely(READ_ONCE(sg_policy->limits_changed))) {
+		WRITE_ONCE(sg_policy->limits_changed, false);
+		sg_policy->need_freq_update = true;
 		return true;
 	}
-
-	/* If the last frequency wasn't set yet then we can still amend it */
-	if (sg_policy->work_in_progress)
-		return true;
 
 	/*
 	 * When frequency-invariant utilization tracking is present, there's no
@@ -122,6 +118,10 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 	 * frequency change, hence the rate limit check is bypassed here.
 	 */
 	if (arch_scale_freq_invariant())
+		return true;
+
+	/* If the last frequency wasn't set yet then we can still amend it */
+	if (sg_policy->work_in_progress)
 		return true;
 
 	return !sugov_should_rate_limit(sg_policy, time);
@@ -195,6 +195,29 @@ static void sugov_calc_avg_cap(struct sugov_policy *sg_policy, u64 curr_ws,
 static bool sugov_update_next_freq(struct sugov_policy *sg_policy, u64 time,
 				   unsigned int next_freq)
 {
+	if (sg_policy->need_freq_update) {
+		sg_policy->need_freq_update = false;
+		/*
+		 * The policy limits have changed, but if the return value of
+		 * cpufreq_driver_resolve_freq() after applying the new limits
+		 * is still equal to the previously selected frequency, the
+		 * driver callback need not be invoked unless the driver
+		 * specifically wants that to happen on every update of the
+		 * policy limits.
+		 */
+		if (cpufreq_driver_test_flags(CPUFREQ_NEED_UPDATE_LIMITS))
+			goto must_update;
+		/*
+		 * Even if the driver doesn't require notification on every
+		 * limits update, we still need to update our internal state
+		 * to reflect the new limits and avoid rate limiting blocking
+		 * future updates. Return false to skip the driver callback.
+		 */
+		sg_policy->next_freq = next_freq;
+		sg_policy->last_freq_update_time = time;
+		return false;
+	}
+
 	/*
 	 * When a frequency update isn't mandatory (!need_freq_update), the rate
 	 * limit is checked again upon frequency reduction because systems with
@@ -206,13 +229,12 @@ static bool sugov_update_next_freq(struct sugov_policy *sg_policy, u64 time,
 	 * systems. A check for arch_scale_freq_invariant() is omitted here
 	 * because unconditionally rechecking the rate limit is cheaper.
 	 */
-	if (sg_policy->need_freq_update)
-		sg_policy->need_freq_update = false;
-	else if (next_freq == sg_policy->next_freq ||
-		 (next_freq < sg_policy->next_freq &&
-		  sugov_should_rate_limit(sg_policy, time)))
+	if (next_freq == sg_policy->next_freq ||
+	    (next_freq < sg_policy->next_freq &&
+	     sugov_should_rate_limit(sg_policy, time)))
 		return false;
 
+must_update:
 	sg_policy->next_freq = next_freq;
 	sg_policy->last_freq_update_time = time;
 
@@ -334,11 +356,16 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 
 static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time)
 {
-	/* Clear iowait_boost if the CPU apprears to have been idle. */
+	/* Clear iowait_boost if the CPU appears to have been idle. */
 	if (sg_cpu->iowait_boost) {
 		s64 delta_ns = time - sg_cpu->last_update;
 
-		if (delta_ns > TICK_NSEC) {
+		/*
+		 * Clear boost if time has advanced beyond TICK_NSEC, or if
+		 * time went backwards (clock instability, TSC adjustment, etc).
+		 * Treating backwards time as idle prevents stale boost values.
+		 */
+		if (delta_ns > TICK_NSEC || delta_ns < 0) {
 			sg_cpu->iowait_boost = 0;
 			sg_cpu->iowait_boost_pending = false;
 		}
@@ -476,11 +503,10 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		}
 
 		/*
-		 * If the util value for all CPUs in a policy is 0, just using >
-		 * will result in a max value of 1. WALT stats can later update
-		 * the aggregated util value, causing get_next_freq() to compute
-		 * freq = max_freq * 1.25 * (util / max) for nonzero util,
-		 * leading to spurious jumps to fmax.
+		 * Use >= to ensure max is always updated to the current CPU
+		 * capacity even when util is 0, preventing a stale max value
+		 * from causing incorrect frequency calculations on the next
+		 * non-zero util update.
 		 */
 		j_util = j_sg_cpu->util;
 		j_max = j_sg_cpu->max;
@@ -973,7 +999,7 @@ static void sugov_limits(struct cpufreq_policy *policy)
 		raw_spin_unlock_irqrestore(&sg_policy->update_lock, flags);
 	}
 
-	sg_policy->limits_changed = true;
+	WRITE_ONCE(sg_policy->limits_changed, true);
 }
 
 static struct cpufreq_governor schedutil_gov = {
