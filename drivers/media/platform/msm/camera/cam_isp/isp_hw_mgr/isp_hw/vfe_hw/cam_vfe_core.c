@@ -24,6 +24,8 @@
 #include "cam_ife_hw_mgr.h"
 #include "cam_debug_util.h"
 
+extern bool is_legacy_timestamp;
+
 static const char drv_name[] = "vfe";
 static uint32_t irq_reg_offset[CAM_IFE_IRQ_REGISTERS_MAX] = {
 	0x0000006C,
@@ -436,7 +438,11 @@ void cam_isp_hw_get_timestamp(struct cam_isp_timestamp *time_stamp)
 {
 	struct timespec ts;
 
-	ktime_get_ts(&ts);
+	if (is_legacy_timestamp)
+		get_monotonic_boottime(&ts);
+	else
+		ktime_get_ts(&ts);
+
 	time_stamp->mono_time.tv_sec    = ts.tv_sec;
 	time_stamp->mono_time.tv_usec   = ts.tv_nsec/1000;
 	time_stamp->time_usecs =  ts.tv_sec * 1000000 +
