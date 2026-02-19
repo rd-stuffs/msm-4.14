@@ -2875,20 +2875,25 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 		chg->system_temp_level = 0;
 	}
 
-	if (chg->system_temp_level == chg->thermal_levels)
+	if (chg->system_temp_level == chg->thermal_levels) {
+		if (skip_thermal)
+			chg->system_temp_level = temp_level;
 		return vote(chg->chg_disable_votable,
 			THERMAL_DAEMON_VOTER, true, 0);
+	}
 
 	vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
-	if (chg->system_temp_level == 0)
+	if (chg->system_temp_level == 0) {
+		if (skip_thermal)
+			chg->system_temp_level = temp_level;
 		return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
+	}
 
 	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
 			chg->thermal_mitigation[chg->system_temp_level]);
 
-	if (skip_thermal) {
+	if (skip_thermal)
 		chg->system_temp_level = temp_level;
-	}
 
 	return 0;
 }
