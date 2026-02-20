@@ -97,7 +97,7 @@ static void msm_drm_display_thread_priority_worker(struct kthread_work *work)
 	 * other real time and normal priority task
 	 */
 	param.sched_priority = 16;
-	ret = sched_setscheduler(task, SCHED_FIFO, &param);
+	ret = sched_setscheduler(task, SCHED_RR, &param);
 	if (ret)
 		pr_warn("pid:%d name:%s priority update failed: %d\n",
 			current->tgid, task->comm, ret);
