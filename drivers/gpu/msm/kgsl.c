@@ -5336,7 +5336,7 @@ static int __init kgsl_core_init(void)
 			"kgsl_low_prio_worker_thread", false)))
 		goto err;
 
-	sched_setscheduler(kgsl_driver.worker_thread, SCHED_FIFO, &param);
+	sched_setscheduler(kgsl_driver.worker_thread, SCHED_RR, &param);
 
 	kgsl_events_init();
 
