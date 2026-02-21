@@ -383,13 +383,16 @@ EXPORT_SYMBOL(drm_bridge_disp_param_set);
 
 ssize_t drm_bridge_disp_param_get(struct drm_bridge *bridge, char *pbuf)
 {
+	ssize_t ret = 0;
+
 	if (!bridge)
 		return 0;
 
-	if (bridge->funcs->disp_param_get)
-		return bridge->funcs->disp_param_get(bridge, pbuf);
+	ret = drm_bridge_disp_param_get(bridge->next, pbuf);
 
-	return drm_bridge_disp_param_get(bridge->next, pbuf);
+	if (bridge->funcs->disp_param_get)
+		ret = bridge->funcs->disp_param_get(bridge, pbuf);
+	return ret;
 }
 EXPORT_SYMBOL(drm_bridge_disp_param_get);
 
