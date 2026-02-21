@@ -72,16 +72,15 @@ if [[ "$KSU" = true ]]; then
 	make olddefconfig
 fi
 
-make -j$(nproc --all) LLVM=1 Image.gz dtb.img dtbo.img 2> >(tee log.txt >&2) || exit $?
+make -j$(nproc --all) LLVM=1 2> >(tee log.txt >&2) || exit $?
 
-kernel="out/arch/arm64/boot/Image.gz"
-dtb="out/arch/arm64/boot/dtb.img"
+kernel="out/arch/arm64/boot/Image.gz-dtb"
 dtbo="out/arch/arm64/boot/dtbo.img"
 
-if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
+if [ -f "$kernel" ] && [ -f "$dtbo" ]; then
 	echo -e "\nKernel compiled successfully! Zipping up...\n"
 	cp -r $AK3_DIR AnyKernel3
-	cp $kernel $dtb $dtbo AnyKernel3
+	cp $kernel $dtbo AnyKernel3
 	cd AnyKernel3
 	git checkout FSociety &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
