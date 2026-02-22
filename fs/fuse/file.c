@@ -396,9 +396,12 @@ u64 fuse_lock_owner_id(struct fuse_conn *fc, fl_owner_t id)
 static bool fuse_range_is_writeback(struct inode *inode, pgoff_t idx_from,
 				   pgoff_t idx_to)
 {
+	struct fuse_conn *fc = get_fuse_conn(inode);
 	struct fuse_inode *fi = get_fuse_inode(inode);
 	struct rb_node *n;
+	bool found = false;
 
+	spin_lock(&fc->lock);
 	n = fi->writepages.rb_node;
 
 	while (n) {
@@ -412,10 +415,13 @@ static bool fuse_range_is_writeback(struct inode *inode, pgoff_t idx_from,
 			n = n->rb_right;
 		else if (idx_to < curr_index)
 			n = n->rb_left;
-		else
-			return true;
+		else {
+			found = true;
+			break;
+		}
 	}
-	return false;
+	spin_unlock(&fc->lock);
+	return found;
 }
 
 static inline bool fuse_page_is_writeback(struct inode *inode, pgoff_t index)
