@@ -1384,6 +1384,10 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 #ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
 	if (sct_mode == 1) {
 		if (current->fpack) {
+			if (current->fpack->filp) {
+				fput(current->fpack->filp);
+				current->fpack->filp = NULL;
+			}
 			if (current->fpack->iname)
 				__putname(current->fpack->iname);
 			memset(current->fpack, 0, sizeof(struct fuse_package));
