@@ -1940,8 +1940,6 @@ static int fuse_writepages_fill(struct page *page,
 	 * under writeback, so we can release the page lock.
 	 */
 	if (data->req == NULL) {
-		struct fuse_inode *fi = get_fuse_inode(inode);
-
 		err = -ENOMEM;
 		req = fuse_request_alloc_nofs(FUSE_MAX_PAGES_PER_REQ);
 		if (!req) {
