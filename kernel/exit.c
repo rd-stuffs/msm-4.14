@@ -234,6 +234,8 @@ void release_task(struct task_struct *p)
 	int zap_leader;
 #ifdef CONFIG_FUSE_FS_SHORTCIRCUIT
 	if (p->fpack) {
+		if (p->fpack->filp)
+			fput(p->fpack->filp);
 		if (p->fpack->iname)
 			__putname(p->fpack->iname);
 		kfree(p->fpack);
