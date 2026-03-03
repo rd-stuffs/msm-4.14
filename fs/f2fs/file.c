@@ -2819,6 +2819,11 @@ static int f2fs_move_file_range(struct file *file_in, loff_t pos_in,
 			goto out;
 	}
 
+	if (f2fs_is_atomic_file(src) || f2fs_is_atomic_file(dst)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
 	ret = -EINVAL;
 	if (pos_in + len > src->i_size || pos_in + len < pos_in)
 		goto out_unlock;
@@ -3257,6 +3262,11 @@ static int f2fs_ioc_set_pin_file(struct file *filp, unsigned long arg)
 		return ret;
 
 	inode_lock(inode);
+
+	if (f2fs_is_atomic_file(inode)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	if (!pin) {
 		clear_inode_flag(inode, FI_PIN_FILE);
