@@ -16260,6 +16260,7 @@ wlan_hdd_update_akm_suit_info(struct wiphy *wiphy)
 {
 	wiphy->iftype_akm_suites = wlan_hdd_akm_suites;
 	wiphy->num_iftype_akm_suites = QDF_ARRAY_SIZE(wlan_hdd_akm_suites);
+	wiphy->max_num_akm_suites = MAX_NUM_AKM_SUITES;
 }
 #else
 static void

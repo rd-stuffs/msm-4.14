@@ -2840,6 +2840,15 @@ enum nl80211_attrs {
 #define NL80211_MAX_NR_CIPHER_SUITES		5
 #define NL80211_MAX_NR_AKM_SUITES		2
 
+/*
+ * NL80211_MAX_NR_AKM_SUITES is obsolete when %NL80211_ATTR_MAX_NUM_AKM_SUITES
+ * is present in %NL80211_CMD_GET_WIPHY response.
+ *
+ * Backported from upstream; explicit value to match userspace nl80211.h
+ * without adding all intermediate enum entries.
+ */
+#define NL80211_ATTR_MAX_NUM_AKM_SUITES		315
+
 #define NL80211_MIN_REMAIN_ON_CHANNEL_TIME	10
 
 /* default RSSI threshold for scan results if none specified. */

@@ -888,6 +888,12 @@ int wiphy_register(struct wiphy *wiphy)
 		}
 	}
 
+	if (!wiphy->max_num_akm_suites)
+		wiphy->max_num_akm_suites = NL80211_MAX_NR_AKM_SUITES;
+	else if (wiphy->max_num_akm_suites < NL80211_MAX_NR_AKM_SUITES ||
+		 wiphy->max_num_akm_suites > CFG80211_MAX_NUM_AKM_SUITES)
+		return -EINVAL;
+
 	rdev->wiphy.registered = true;
 	rtnl_unlock();
 
