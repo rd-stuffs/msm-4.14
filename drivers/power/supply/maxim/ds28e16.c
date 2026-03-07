@@ -125,7 +125,7 @@ short Read_RomID(unsigned char *RomID)
 	}
 
 	if ((ow_reset()) != 0) {
-		ds_err("Read_RomID: Failed to reset ds28e16!\n");
+		ds_dbg("Read_RomID: Failed to reset ds28e16!\n");
 		ow_reset();
 		return ERROR_NO_DEVICE;
 	}
