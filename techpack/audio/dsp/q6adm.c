@@ -913,6 +913,7 @@ int adm_set_pp_params(int port_id, int copp_idx,
 	int port_idx = 0;
 	atomic_t *copp_stat = NULL;
 	int ret = 0;
+	int err = 0;
 
 	port_id = afe_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
@@ -987,10 +988,17 @@ int adm_set_pp_params(int port_id, int copp_idx,
 		ret = -ETIMEDOUT;
 		goto done;
 	}
-	if (atomic_read(copp_stat) > 0) {
-		pr_err("%s: DSP returned error[%s]\n", __func__,
-		       adsp_err_get_err_str(atomic_read(copp_stat)));
-		ret = adsp_err_get_lnx_err_code(atomic_read(copp_stat));
+
+	err = atomic_read(copp_stat);
+
+	if (err > 0) {
+		if (err == ADSP_EUNSUPPORTED)
+			pr_debug("%s: DSP returned error[%s]\n", __func__,
+						adsp_err_get_err_str(err));
+		else
+			pr_err("%s: DSP returned error[%s]\n", __func__,
+						adsp_err_get_err_str(err));
+		ret = adsp_err_get_lnx_err_code(err);
 		goto done;
 	}
 
@@ -1613,8 +1621,12 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 			}
 
 			if (payload[1] != 0) {
-				pr_err("%s: cmd = 0x%x returned error = 0x%x\n",
-					__func__, payload[0], payload[1]);
+				if (payload[1] == ADSP_EUNSUPPORTED)
+					pr_debug("%s: cmd = 0x%x returned error = 0x%x\n",
+						__func__, payload[0], payload[1]);
+				else
+					pr_err("%s: cmd = 0x%x returned error = 0x%x\n",
+						__func__, payload[0], payload[1]);
 			}
 			switch (payload[0]) {
 			case ADM_CMD_SET_PP_PARAMS_V5:
