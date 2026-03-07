@@ -5187,7 +5187,7 @@ static int dwc3_msm_pm_suspend(struct device *dev)
 	 */
 	if (!dwc->ignore_wakeup_src_in_hostmode || !mdwc->in_host_mode) {
 		if (!atomic_read(&dwc->in_lpm)) {
-			dev_err(mdwc->dev, "Abort PM suspend!! (USB is outside LPM)\n");
+			dev_err_ratelimited(mdwc->dev, "Abort PM suspend!! (USB is outside LPM)\n");
 			return -EBUSY;
 		}
 
