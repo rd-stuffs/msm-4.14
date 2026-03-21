@@ -829,6 +829,8 @@ struct hdd_mon_set_ch_info {
  * @ch_info: monitor mode channel information
  * @ap_supports_immediate_power_save: Does the current AP allow our STA
  *    to immediately go into power save?
+ * @gtk_offload_bypassed: GTK offload was intentionally skipped for the
+ *    current suspend cycle
  */
 struct hdd_station_ctx {
 	struct csr_roam_profile roam_profile;
@@ -848,6 +850,7 @@ struct hdd_station_ctx {
 	int sta_debug_state;
 	struct hdd_mon_set_ch_info ch_info;
 	bool ap_supports_immediate_power_save;
+	bool gtk_offload_bypassed;
 };
 
 /**
