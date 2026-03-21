@@ -18,7 +18,7 @@ include $(srctree)/arch/arm64/boot/dts/Makefile
 
 OBJCOPYFLAGS_Image :=-O binary -R .note -R .note.gnu.build-id -R .comment -S
 
-targets := Image Image.bz2 Image.gz Image.lz4 Image.lzma Image.lzo dtbo.img dtb.img
+targets := Image Image.bz2 Image.gz Image.lz4 Image.lzma Image.lzo dtbo.img dtbo-miui.img dtb.img
 
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
@@ -28,7 +28,8 @@ DTB_LIST := $(dtb-y)
 endif
 DTB_OBJS := $(shell find $(obj)/dts/ -name \*.dtb)
 
-DTBO_OBJS := $(shell find $(obj)/dts/ -name \*.dtbo)
+DTBO_OBJS := $(obj)/dts/qcom/sdmmagpie-idp-overlay.dtbo
+DTBO_MIUI_OBJS := $(obj)/dts/qcom/sdmmagpie-idp-overlay-miui.dtbo
 
 # Add RTIC DTB to the DTB list if RTIC MPGen is enabled
 # Note, we keep this for compatibility with
@@ -71,6 +72,9 @@ $(obj)/Image.gz-dtb: $(obj)/Image.gz $(DTB_OBJS) FORCE
 	$(call if_changed,cat)
 
 $(obj)/dtbo.img: $(DTBO_OBJS) FORCE
+	$(call if_changed,mkdtimg)
+
+$(obj)/dtbo-miui.img: $(DTBO_MIUI_OBJS) FORCE
 	$(call if_changed,mkdtimg)
 
 $(obj)/dtb.img: $(DTB_OBJS) FORCE

@@ -308,9 +308,11 @@ endif
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 	dtbo-$(CONFIG_ARCH_SDMMAGPIE) += \
-		sdmmagpie-idp-overlay.dtbo
+		sdmmagpie-idp-overlay.dtbo \
+		sdmmagpie-idp-overlay-miui.dtbo
 
 sdmmagpie-idp-overlay.dtbo-base := sdmmagpie.dtb
+sdmmagpie-idp-overlay-miui.dtbo-base := sdmmagpie.dtb
 else
 dtb-$(CONFIG_ARCH_SDMMAGPIE)	+= sdmmagpie-rumi.dtb \
 	sdmmagpie-idp.dtb \
