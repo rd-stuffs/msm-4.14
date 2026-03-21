@@ -29,6 +29,8 @@ struct f_uvc_opts {
 	unsigned int					streaming_interface;
 	char						function_name[32];
 
+	bool						enable_interrupt_ep;
+
 	/*
 	 * Control descriptors array pointers for full-/high-speed and
 	 * super-speed. They point by default to the uvc_fs_control_cls and
@@ -52,7 +54,6 @@ struct f_uvc_opts {
 	struct uvc_camera_terminal_descriptor		uvc_camera_terminal;
 	struct uvc_processing_unit_descriptor		uvc_processing;
 	struct uvc_output_terminal_descriptor		uvc_output_terminal;
-	struct uvc_color_matching_descriptor		uvc_color_matching;
 
 	/*
 	 * Control descriptors pointers arrays for full-/high-speed and
@@ -82,6 +83,12 @@ struct f_uvc_opts {
 	 */
 	struct mutex			lock;
 	int				refcnt;
+
+	/*
+	 * Only for legacy gadget. Shall be NULL for configfs-composed gadgets,
+	 * which is guaranteed by alloc_inst implementation of f_uvc doing kzalloc.
+	 */
+	struct uvcg_streaming_header	*header;
 };
 
 #endif /* U_UVC_H */

@@ -76,14 +76,14 @@ static struct usb_interface_descriptor uvc_control_intf = {
 	.bDescriptorType	= USB_DT_INTERFACE,
 	.bInterfaceNumber	= UVC_INTF_VIDEO_CONTROL,
 	.bAlternateSetting	= 0,
-	.bNumEndpoints		= 1,
+	.bNumEndpoints		= 0,
 	.bInterfaceClass	= USB_CLASS_VIDEO,
 	.bInterfaceSubClass	= UVC_SC_VIDEOCONTROL,
 	.bInterfaceProtocol	= 0x00,
 	.iInterface		= 0,
 };
 
-static struct usb_endpoint_descriptor uvc_control_ep = {
+static struct usb_endpoint_descriptor uvc_interrupt_ep = {
 	.bLength		= USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType	= USB_DT_ENDPOINT,
 	.bEndpointAddress	= USB_DIR_IN,
@@ -92,8 +92,8 @@ static struct usb_endpoint_descriptor uvc_control_ep = {
 	.bInterval		= 8,
 };
 
-static struct usb_ss_ep_comp_descriptor uvc_ss_control_comp = {
-	.bLength		= sizeof(uvc_ss_control_comp),
+static struct usb_ss_ep_comp_descriptor uvc_ss_interrupt_comp = {
+	.bLength		= sizeof(uvc_ss_interrupt_comp),
 	.bDescriptorType	= USB_DT_SS_ENDPOINT_COMP,
 	/* The following 3 values can be tweaked if necessary. */
 	.bMaxBurst		= 0,
@@ -101,7 +101,7 @@ static struct usb_ss_ep_comp_descriptor uvc_ss_control_comp = {
 	.wBytesPerInterval	= cpu_to_le16(UVC_STATUS_MAX_PACKET_SIZE),
 };
 
-static struct uvc_control_endpoint_descriptor uvc_control_cs_ep = {
+static struct uvc_control_endpoint_descriptor uvc_interrupt_cs_ep = {
 	.bLength		= UVC_DT_CONTROL_ENDPOINT_SIZE,
 	.bDescriptorType	= USB_DT_CS_ENDPOINT,
 	.bDescriptorSubType	= UVC_EP_INTERRUPT,
@@ -303,14 +303,17 @@ uvc_function_set_alt(struct usb_function *f, unsigned interface, unsigned alt)
 		if (alt)
 			return -EINVAL;
 
-		uvcg_info(f, "reset UVC Control\n");
-		usb_ep_disable(uvc->control_ep);
+		if (uvc->enable_interrupt_ep) {
+			uvcg_info(f, "reset UVC interrupt endpoint\n");
+			usb_ep_disable(uvc->interrupt_ep);
 
-		if (!uvc->control_ep->desc)
-			if (config_ep_by_speed(cdev->gadget, f, uvc->control_ep))
-				return -EINVAL;
+			if (!uvc->interrupt_ep->desc)
+				if (config_ep_by_speed(cdev->gadget, f,
+						       uvc->interrupt_ep))
+					return -EINVAL;
 
-		usb_ep_enable(uvc->control_ep);
+			usb_ep_enable(uvc->interrupt_ep);
+		}
 
 		if (uvc->state == UVC_STATE_DISCONNECTED) {
 			memset(&v4l2_event, 0, sizeof(v4l2_event));
@@ -384,7 +387,8 @@ uvc_function_disable(struct usb_function *f)
 	uvc->state = UVC_STATE_DISCONNECTED;
 
 	usb_ep_disable(uvc->video.ep);
-	usb_ep_disable(uvc->control_ep);
+	if (uvc->enable_interrupt_ep)
+		usb_ep_disable(uvc->interrupt_ep);
 }
 
 /* --------------------------------------------------------------------------
@@ -521,9 +525,9 @@ uvc_copy_descriptors(struct uvc_device *uvc, enum usb_device_speed speed)
 	 * uvc_iad
 	 * uvc_control_intf
 	 * Class-specific UVC control descriptors
-	 * uvc_control_ep
-	 * uvc_control_cs_ep
-	 * uvc_ss_control_comp (for SS only)
+	 * uvc_interrupt_ep
+	 * uvc_interrupt_cs_ep
+	 * uvc_ss_interrupt_comp (for SS only)
 	 * uvc_streaming_intf_alt0
 	 * Class-specific UVC streaming descriptors
 	 * uvc_{fs|hs}_streaming
@@ -533,15 +537,18 @@ uvc_copy_descriptors(struct uvc_device *uvc, enum usb_device_speed speed)
 	control_size = 0;
 	streaming_size = 0;
 	bytes = uvc_iad.bLength + uvc_control_intf.bLength
-	      + uvc_control_ep.bLength + uvc_control_cs_ep.bLength
 	      + uvc_streaming_intf_alt0.bLength;
 
-	if (speed == USB_SPEED_SUPER ||
-	    speed == USB_SPEED_SUPER_PLUS) {
-		bytes += uvc_ss_control_comp.bLength;
-		n_desc = 6;
-	} else {
-		n_desc = 5;
+	n_desc = 3;
+	if (uvc->enable_interrupt_ep) {
+		bytes += uvc_interrupt_ep.bLength + uvc_interrupt_cs_ep.bLength;
+		n_desc += 2;
+
+		if (speed == USB_SPEED_SUPER ||
+		    speed == USB_SPEED_SUPER_PLUS) {
+			bytes += uvc_ss_interrupt_comp.bLength;
+			n_desc += 1;
+		}
 	}
 
 	for (src = (const struct usb_descriptor_header **)uvc_control_desc;
@@ -580,12 +587,15 @@ uvc_copy_descriptors(struct uvc_device *uvc, enum usb_device_speed speed)
 	uvc_control_header->bInCollection = 1;
 	uvc_control_header->baInterfaceNr[0] = uvc->streaming_intf;
 
-	UVC_COPY_DESCRIPTOR(mem, dst, &uvc_control_ep);
-	if (speed == USB_SPEED_SUPER
-	    || speed == USB_SPEED_SUPER_PLUS)
-		UVC_COPY_DESCRIPTOR(mem, dst, &uvc_ss_control_comp);
+	if (uvc->enable_interrupt_ep) {
+		UVC_COPY_DESCRIPTOR(mem, dst, &uvc_interrupt_ep);
+		if (speed == USB_SPEED_SUPER ||
+		    speed == USB_SPEED_SUPER_PLUS)
+			UVC_COPY_DESCRIPTOR(mem, dst, &uvc_ss_interrupt_comp);
 
-	UVC_COPY_DESCRIPTOR(mem, dst, &uvc_control_cs_ep);
+		UVC_COPY_DESCRIPTOR(mem, dst, &uvc_interrupt_cs_ep);
+	}
+
 	UVC_COPY_DESCRIPTOR(mem, dst, &uvc_streaming_intf_alt0);
 
 	uvc_streaming_header = mem;
@@ -668,20 +678,40 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 			    (opts->streaming_maxburst + 1));
 
 	/* Allocate endpoints. */
-	ep = usb_ep_autoconfig(cdev->gadget, &uvc_control_ep);
-	if (!ep) {
-		uvcg_info(f, "Unable to allocate control EP\n");
-		goto error;
+	if (opts->enable_interrupt_ep) {
+		ep = usb_ep_autoconfig(cdev->gadget, &uvc_interrupt_ep);
+		if (!ep) {
+			uvcg_info(f, "Unable to allocate interrupt EP\n");
+			goto error;
+		}
+		uvc->interrupt_ep = ep;
+		uvc_control_intf.bNumEndpoints = 1;
 	}
-	uvc->control_ep = ep;
+	uvc->enable_interrupt_ep = opts->enable_interrupt_ep;
 
-	ep = usb_ep_autoconfig(cdev->gadget, &uvc_fs_streaming_ep);
+	/*
+	 * gadget_is_{super|dual}speed() API check UDC controller capitblity. It should pass down
+	 * highest speed endpoint descriptor to UDC controller. So UDC controller driver can reserve
+	 * enough resource at check_config(), especially mult and maxburst. So UDC driver (such as
+	 * cdns3) can know need at least (mult + 1) * (maxburst + 1) * wMaxPacketSize internal
+	 * memory for this uvc functions. This is the only straightforward method to resolve the UDC
+	 * resource allocation issue in the current gadget framework.
+	 */
+	if (gadget_is_superspeed(c->cdev->gadget))
+		ep = usb_ep_autoconfig_ss(cdev->gadget, &uvc_ss_streaming_ep,
+					  &uvc_ss_streaming_comp);
+	else if (gadget_is_dualspeed(cdev->gadget))
+		ep = usb_ep_autoconfig(cdev->gadget, &uvc_hs_streaming_ep);
+	else
+		ep = usb_ep_autoconfig(cdev->gadget, &uvc_fs_streaming_ep);
+
 	if (!ep) {
 		uvcg_info(f, "Unable to allocate streaming EP\n");
 		goto error;
 	}
 	uvc->video.ep = ep;
 
+	uvc_fs_streaming_ep.bEndpointAddress = uvc->video.ep->address;
 	uvc_hs_streaming_ep.bEndpointAddress = uvc->video.ep->address;
 	uvc_ss_streaming_ep.bEndpointAddress = uvc->video.ep->address;
 
@@ -802,7 +832,6 @@ static struct usb_function_instance *uvc_alloc_inst(void)
 	struct uvc_camera_terminal_descriptor *cd;
 	struct uvc_processing_unit_descriptor *pd;
 	struct uvc_output_terminal_descriptor *od;
-	struct uvc_color_matching_descriptor *md;
 	struct uvc_descriptor_header **ctl_cls;
 	int ret;
 
@@ -851,14 +880,6 @@ static struct usb_function_instance *uvc_alloc_inst(void)
 	od->bSourceID			= 2;
 	od->iTerminal			= 0;
 
-	md = &opts->uvc_color_matching;
-	md->bLength			= UVC_DT_COLOR_MATCHING_SIZE;
-	md->bDescriptorType		= USB_DT_CS_INTERFACE;
-	md->bDescriptorSubType		= UVC_VS_COLORFORMAT;
-	md->bColorPrimaries		= 1;
-	md->bTransferCharacteristics	= 1;
-	md->bMatrixCoefficients		= 4;
-
 	/* Prepare fs control class descriptors for configfs-based gadgets */
 	ctl_cls = opts->uvc_fs_control_cls;
 	ctl_cls[0] = NULL;	/* assigned elsewhere by configfs */
@@ -897,7 +918,8 @@ static void uvc_free(struct usb_function *f)
 	struct uvc_device *uvc = to_uvc(f);
 	struct f_uvc_opts *opts = container_of(f->fi, struct f_uvc_opts,
 					       func_inst);
-	config_item_put(&uvc->header->item);
+	if (!opts->header)
+		config_item_put(&uvc->header->item);
 	--opts->refcnt;
 	kfree(uvc);
 }
@@ -989,25 +1011,29 @@ static struct usb_function *uvc_alloc(struct usb_function_instance *fi)
 	uvc->desc.hs_streaming = opts->hs_streaming;
 	uvc->desc.ss_streaming = opts->ss_streaming;
 
-	streaming = config_group_find_item(&opts->func_inst.group, "streaming");
-	if (!streaming)
-		goto err_config;
+	if (opts->header) {
+		uvc->header = opts->header;
+	} else {
+		streaming = config_group_find_item(&opts->func_inst.group, "streaming");
+		if (!streaming)
+			goto err_config;
 
-	header = config_group_find_item(to_config_group(streaming), "header");
-	config_item_put(streaming);
-	if (!header)
-		goto err_config;
+		header = config_group_find_item(to_config_group(streaming), "header");
+		config_item_put(streaming);
+		if (!header)
+			goto err_config;
 
-	h = config_group_find_item(to_config_group(header), "h");
-	config_item_put(header);
-	if (!h)
-		goto err_config;
+		h = config_group_find_item(to_config_group(header), "h");
+		config_item_put(header);
+		if (!h)
+			goto err_config;
 
-	uvc->header = to_uvcg_streaming_header(h);
-	if (!uvc->header->linked) {
-		mutex_unlock(&opts->lock);
-		kfree(uvc);
-		return ERR_PTR(-EBUSY);
+		uvc->header = to_uvcg_streaming_header(h);
+		if (!uvc->header->linked) {
+			mutex_unlock(&opts->lock);
+			kfree(uvc);
+			return ERR_PTR(-EBUSY);
+		}
 	}
 
 	++opts->refcnt;
@@ -1033,5 +1059,6 @@ err_config:
 }
 
 DECLARE_USB_FUNCTION_INIT(uvc, uvc_alloc_inst, uvc_alloc);
+MODULE_DESCRIPTION("USB Video Class Gadget driver");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Laurent Pinchart");
