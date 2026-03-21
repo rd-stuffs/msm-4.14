@@ -76,11 +76,12 @@ make -j$(nproc --all) LLVM=1 2> >(tee log.txt >&2) || exit $?
 
 kernel="out/arch/arm64/boot/Image.gz-dtb"
 dtbo="out/arch/arm64/boot/dtbo.img"
+dtbo_miui="out/arch/arm64/boot/dtbo-miui.img"
 
-if [ -f "$kernel" ] && [ -f "$dtbo" ]; then
+if [ -f "$kernel" ] && [ -f "$dtbo" ] && [ -f "$dtbo_miui" ]; then
 	echo -e "\nKernel compiled successfully! Zipping up...\n"
 	cp -r $AK3_DIR AnyKernel3
-	cp $kernel $dtbo AnyKernel3
+	cp $kernel $dtbo $dtbo_miui AnyKernel3
 	cd AnyKernel3
 	git checkout FSociety &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
