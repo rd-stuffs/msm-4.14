@@ -3725,7 +3725,6 @@ static struct platform_driver gcc_sm6150_driver = {
 	.driver		= {
 		.name	= "gcc-sm6150",
 		.of_match_table = gcc_sm6150_match_table,
-		.probe_type = PROBE_FORCE_SYNCHRONOUS,
 	},
 };
 
