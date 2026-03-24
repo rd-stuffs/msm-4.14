@@ -21,7 +21,6 @@
 #include <linux/irq.h>
 #include <linux/iio/consumer.h>
 #include <linux/pmic-voter.h>
-#include <linux/module.h>
 #include <linux/of_batterydata.h>
 #include <linux/ktime.h>
 #include <linux/usb/usbpd.h>
@@ -49,9 +48,6 @@
 			pr_debug("%s: %s: " fmt, chg->name,	\
 				__func__, ##__VA_ARGS__);	\
 	} while (0)
-
-bool skip_thermal = false;
-module_param(skip_thermal, bool, 0644);
 
 #define typec_rp_med_high(chg, typec_mode)			\
 	((typec_mode == POWER_SUPPLY_TYPEC_SOURCE_MEDIUM	\
@@ -2839,8 +2835,6 @@ extern int LctThermal;
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
-	int temp_level;
-
 	if (val->intval < 0)
 		return -EINVAL;
 
@@ -2870,11 +2864,6 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 
 	chg->system_temp_level = val->intval;
 
-	if (skip_thermal) {
-		temp_level = chg->system_temp_level;
-		chg->system_temp_level = 0;
-	}
-
 	if (chg->system_temp_level == chg->thermal_levels)
 		return vote(chg->chg_disable_votable,
 			THERMAL_DAEMON_VOTER, true, 0);
@@ -2885,11 +2874,6 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 
 	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
 			chg->thermal_mitigation[chg->system_temp_level]);
-
-	if (skip_thermal) {
-		chg->system_temp_level = temp_level;
-	}
-
 	return 0;
 }
 
