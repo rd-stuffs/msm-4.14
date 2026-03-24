@@ -176,8 +176,8 @@ HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC)
 		    -DLOCALE
 
 # generated files seem to need this to find local include files
-HOSTCFLAGS_zconf.lex.o	:= -I$(src)
-HOSTCFLAGS_zconf.tab.o	:= -I$(src)
+HOSTCFLAGS_zconf.lex.o	:= -I $(srctree)/$(src)
+HOSTCFLAGS_zconf.tab.o	:= -I $(srctree)/$(src)
 
 LEX_PREFIX_zconf	:= zconf
 YACC_PREFIX_zconf	:= zconf
