@@ -2827,11 +2827,6 @@ int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
   return 0;
 }
 
-extern union power_supply_propval lct_therm_lvl_reserved;
-extern bool lct_backlight_off;
-extern int LctIsInCall;
-extern int LctThermal;
-
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
@@ -2844,36 +2839,9 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 	if (val->intval > chg->thermal_levels)
 		return -EINVAL;
 
-	if (LctThermal == 0) { //from therml-engine always store lvl_sel
-		lct_therm_lvl_reserved.intval = val->intval;
-	}
-
-	/*backlight off and not-incall*/
-	if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > LCT_THERM_LCDOFF_LEVEL)) {
-		pr_info("leve ignored:backlight_off:%d level:%d",lct_backlight_off,val->intval);
-		return 0;
-	}
-
-	if ((LctIsInCall == 1) && (val->intval != LCT_THERM_CALL_LEVEL)) {
-		pr_info("leve ignored:LctIsInCall:%d level:%d",LctIsInCall,val->intval);
-		return 0;
-	}
-
-	if (val->intval == chg->system_temp_level)
-		return 0;
-
-	chg->system_temp_level = val->intval;
-
-	if (chg->system_temp_level == chg->thermal_levels)
-		return vote(chg->chg_disable_votable,
-			THERMAL_DAEMON_VOTER, true, 0);
-
 	vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
-	if (chg->system_temp_level == 0)
-		return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
+	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
 
-	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
-			chg->thermal_mitigation[chg->system_temp_level]);
 	return 0;
 }
 
