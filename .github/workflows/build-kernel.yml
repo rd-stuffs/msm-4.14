@@ -5,60 +5,37 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/Sao_Paulo
+      KBUILD_BUILD_USER: nobody
+      KBUILD_BUILD_HOST: android-build
 
     steps:
       - name: Checkout
         uses: actions/checkout@main
 
-      - name: Setup timezone
-        uses: szenius/set-timezone@master
-        with:
-          timezoneLinux: "America/Sao_Paulo"
-
-      - name: Run standard build script
+      - name: Build
         run: |
-          export KBUILD_BUILD_USER=nobody
-          export KBUILD_BUILD_HOST=android-build
-          source build.sh
-          echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
+          bash build.sh
+          bash build.sh --su
 
-      - name: Run KSU build script
-        run: |
-          export KBUILD_BUILD_USER=nobody
-          export KBUILD_BUILD_HOST=android-build
-          source build.sh --su
-          echo "ZIPNAME_KSU=${ZIPNAME}" >> $GITHUB_ENV
-
-      - name: Upload standard artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@main
         with:
-          name: standard-artifact
-          path: ${{ env.ZIPNAME }}
+          name: kernel-zips
+          path: "*.zip"
 
-      - name: Upload KSU artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: KSU-artifact
-          path: ${{ env.ZIPNAME_KSU }}
-
-      - name: Create Telegram caption
+      - name: Send to Telegram
         run: |
-          BUILD_DATE="$(date '+%H:%M %d/%m/%Y')"
-          HEAD="$(git rev-parse HEAD)"
-          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
-          echo -e "${BUILD_DATE}\n\n${HEAD_COMMIT}" > caption.txt
-
-      - name: Upload standard build to Telegram
-        run: |
-          caption=$(<caption.txt)
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-          -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-          -F document=@"${{ env.ZIPNAME }}" \
-          -F caption="${caption}"
-
-      - name: Upload KSU build to Telegram
-        run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-          -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-          -F document=@"${{ env.ZIPNAME_KSU }}"
+          DATE=$(date '+%H:%M %d/%m/%Y')
+          COMMIT="https://github.com/${{ github.repository }}/commit/$(git rev-parse HEAD)"
+          STANDARD=$(ls FSociety-surya-*.zip)
+          KSU=$(ls FSociety-KSU-*.zip)
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -F document=@"${STANDARD}" \
+            -F caption="${DATE}"$'\n\n'"${COMMIT}"
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -F document=@"${KSU}"

@@ -129,7 +129,7 @@ kernel/configs/android-*.cfg
 out/
 
 # Ignore personal files
-android/
+AnyKernel3/
 log.txt
 *.zip
 tc/
