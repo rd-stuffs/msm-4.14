@@ -519,7 +519,7 @@ void ion_add_heap(struct ion_device *idev, struct ion_heap *heap)
 	struct ion_heap_data *hdata = &idev->heap_data[idev->heap_count];
 
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE) {
-		heap->wq = alloc_workqueue("%s", WQ_UNBOUND | WQ_MEM_RECLAIM, 1,
+		heap->wq = alloc_workqueue("%s", WQ_UNBOUND | WQ_MEM_RECLAIM, 0,
 					   heap->name);
 		BUG_ON(!heap->wq);
 		workqueue_set_max_active(heap->wq, 1);
