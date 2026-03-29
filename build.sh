@@ -8,8 +8,7 @@ set -euo pipefail
 trap 'printf "\nInterrupted.\n"; exit 1' INT
 
 ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
-LLVM_REV="22"
-TC_DIR="$(pwd)/tc/clang-$LLVM_REV"
+TC_DIR="$(pwd)/tc/clang-neutron"
 AK3_DIR="$(pwd)/AnyKernel3"
 DEFCONFIG="surya_defconfig"
 
@@ -21,9 +20,9 @@ fi
 export PATH="$TC_DIR/bin:$PATH"
 
 if [ ! -d "$TC_DIR" ]; then
-	printf "Cloning Slim LLVM to %s...\n" "$TC_DIR"
-	git clone --depth=1 -b "$LLVM_REV" \
-		https://bitbucket.org/rdxzv/clang-standalone.git "$TC_DIR"
+	printf "Cloning Neutron Clang to %s...\n" "$TC_DIR"
+	git clone --depth=1 -b nc \
+		https://bitbucket.org/rdxzv/neutron.git "$TC_DIR"
 fi
 
 if [ ! -d "$AK3_DIR" ]; then
