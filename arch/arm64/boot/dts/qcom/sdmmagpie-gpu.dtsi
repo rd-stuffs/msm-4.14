@@ -141,7 +141,7 @@
 				qcom,gpu-model = "Adreno642Lv1";
 				qcom,vk-device-id= <0x06030500>;
 			};
-		};		
+		};
 
 		/* GPU Mempools */
 		qcom,gpu-mempools {
@@ -629,7 +629,7 @@
 
 		qcom,secure_align_mask = <0xfff>;
 		qcom,retention;
-                qcom,unmap_fast;
+		qcom,unmap_fast;
 		qcom,hyp_secure_alloc;
 
 		gfx3d_user: gfx3d_user {
