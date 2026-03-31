@@ -226,6 +226,9 @@ struct eventpoll {
 	/* used to optimize loop detection check */
 	u64 gen;
 
+	/* ep_get_upwards_depth_proc() may still observe epi->ep under RCU */
+	struct rcu_head rcu;
+
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	/* used to track busy poll napi_id */
 	unsigned int napi_id;
@@ -866,7 +869,7 @@ static void ep_free(struct eventpoll *ep)
 	mutex_destroy(&ep->mtx);
 	free_uid(ep->user);
 	wakeup_source_unregister(ep->ws);
-	kfree(ep);
+	kfree_rcu(ep, rcu);
 }
 
 static int ep_eventpoll_release(struct inode *inode, struct file *file)
