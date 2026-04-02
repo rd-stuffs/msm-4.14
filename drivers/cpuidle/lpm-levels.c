@@ -125,6 +125,9 @@ static int lpm_drm_notify(struct notifier_block *nb,
 	if (val != MSM_DRM_EARLY_EVENT_BLANK || !evdata || !evdata->data)
 		return NOTIFY_DONE;
 
+	if (evdata->id != MSM_DRM_PRIMARY_DISPLAY)
+		return NOTIFY_DONE;
+
 	blank = *(int *)(evdata->data);
 
 	switch (blank) {
