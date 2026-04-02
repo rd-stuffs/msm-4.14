@@ -67,7 +67,7 @@ make "$DEFCONFIG" &>/dev/null
 if [[ $KSU == "true" ]]; then
 	printf "Building KernelSU variant...\n"
 	ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
-	scripts/config --file out/.config -e KSU -e KSU_ALLOWLIST_WORKAROUND
+	scripts/config --file out/.config -e KSU
 	make olddefconfig &>/dev/null
 fi
 
