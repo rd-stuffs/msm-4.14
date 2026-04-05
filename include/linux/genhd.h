@@ -142,6 +142,7 @@ struct hd_struct {
 #define GENHD_FL_BLOCK_EVENTS_ON_EXCL_WRITE	256
 #define GENHD_FL_NO_PART_SCAN			512
 #define GENHD_FL_NO_RANDOMIZE			1024
+#define GENHD_FL_HIDDEN			1024
 
 enum {
 	DISK_EVENT_MEDIA_CHANGE			= 1 << 0, /* media changed */
@@ -391,10 +392,16 @@ static inline void free_part_info(struct hd_struct *part)
 extern void part_round_stats(struct request_queue *q, int cpu, struct hd_struct *part);
 
 /* block/genhd.c */
-extern void device_add_disk(struct device *parent, struct gendisk *disk);
+extern void device_add_disk(struct device *parent, struct gendisk *disk,
+			    const struct attribute_group **groups);
 static inline void add_disk(struct gendisk *disk)
 {
-	device_add_disk(NULL, disk);
+	device_add_disk(NULL, disk, NULL);
+}
+extern void device_add_disk_no_queue_reg(struct device *parent, struct gendisk *disk);
+static inline void add_disk_no_queue_reg(struct gendisk *disk)
+{
+	device_add_disk_no_queue_reg(NULL, disk);
 }
 
 extern void del_gendisk(struct gendisk *gp);
