@@ -653,6 +653,17 @@ config ZSMALLOC_CHAIN_SIZE
 
 	  For more information, see zsmalloc documentation.
 
+config SWAP_ENABLE_READAHEAD
+	bool "Enable readahead on page swap in"
+	depends on SWAP
+	default y
+	help
+	  When a page fault occurs, adjacent swap pages are also paged in
+	  expecting those pages will be used in the near future. This
+	  behaviour is good for disk-based swap, but harmful for in-memory
+	  compression (e.g. zram) as it wastes CPU decompressing unneeded
+	  pages under memory pressure.
+
 config GENERIC_EARLY_IOREMAP
 	bool
 
