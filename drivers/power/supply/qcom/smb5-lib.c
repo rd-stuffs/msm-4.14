@@ -2738,7 +2738,7 @@ static void smblib_get_start_vbat_before_step_charge(struct smb_charger *chg)
 	else
 		pr_err("could not get vbat vol from bms\n");
 
-	pr_err("chg->start_step_vbat: %d\n", chg->start_step_vbat);
+	pr_debug("chg->start_step_vbat: %d\n", chg->start_step_vbat);
 }
 
 /***********************
