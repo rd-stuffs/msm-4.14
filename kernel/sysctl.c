@@ -115,11 +115,6 @@ extern unsigned int sysctl_nr_open_min, sysctl_nr_open_max;
 extern int sysctl_nr_trim_pages;
 #endif
 
-/* Constants used for minimum and  maximum */
-#ifdef CONFIG_LOCKUP_DETECTOR
-static int sixty = 60;
-#endif
-
 static int __maybe_unused neg_one = -1;
 static int __maybe_unused neg_three = -3;
 
@@ -132,6 +127,7 @@ static int int_max = INT_MAX;
 static unsigned long zero_ul;
 static unsigned long one_ul = 1;
 static unsigned long long_max = LONG_MAX;
+static int sixty = 60;
 static int one_hundred = 100;
 static int one_thousand = 1000;
 static int two_hundred_fifty_five = 255;
