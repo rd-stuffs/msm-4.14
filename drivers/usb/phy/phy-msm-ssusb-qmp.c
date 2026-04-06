@@ -408,7 +408,7 @@ static void usb_qmp_update_portselect_phymode(struct msm_ssphy_qmp *phy)
 
 		/* update port select */
 		if (val > 0) {
-			dev_err(phy->phy.dev,
+			dev_dbg(phy->phy.dev,
 				"USB DP QMP PHY: Update TYPEC CTRL(%d)\n", val);
 			writel_relaxed(val, phy->base +
 				phy->phy_reg[USB3_DP_COM_TYPEC_CTRL]);
