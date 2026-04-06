@@ -107,7 +107,7 @@ static unsigned long read_event(struct cpu_pmu_stats *cpustats, int event_id)
 	unsigned long ev_count;
 	u64 total;
 
-	if (!event->pevent || perf_event_read_local(event->pevent, &total))
+	if (!event->pevent || perf_event_read_local(event->pevent, &total, NULL, NULL))
 		return 0;
 
 	ev_count = total - event->prev_count;
