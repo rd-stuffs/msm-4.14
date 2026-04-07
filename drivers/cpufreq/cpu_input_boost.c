@@ -18,11 +18,15 @@ static unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
 static unsigned int wake_boost_duration = CONFIG_WAKE_BOOST_DURATION_MS;
 static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
+static unsigned int min_freq_lp = CONFIG_MIN_FREQ_LP;
+static unsigned int min_freq_hp = CONFIG_MIN_FREQ_PERF;
 
 module_param(input_boost_duration, short, 0644);
 module_param(wake_boost_duration, uint, 0644);
 module_param(input_boost_freq_lp, uint, 0644);
 module_param(input_boost_freq_hp, uint, 0644);
+module_param(min_freq_lp, uint, 0644);
+module_param(min_freq_hp, uint, 0644);
 
 /* The sched_param struct is located elsewhere in newer kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
@@ -62,9 +66,9 @@ static unsigned int get_input_boost_freq(struct cpufreq_policy *policy)
 	unsigned int freq;
 
 	if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
-		freq = max(input_boost_freq_lp, (unsigned int)CONFIG_MIN_FREQ_LP);
+		freq = max(input_boost_freq_lp, min_freq_lp);
 	else
-		freq = max(input_boost_freq_hp, (unsigned int)CONFIG_MIN_FREQ_PERF);
+		freq = max(input_boost_freq_hp, min_freq_hp);
 
 	return min(freq, policy->max);
 }
@@ -214,9 +218,9 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 	if (test_bit(INPUT_BOOST, &b->state))
 		policy->min = get_input_boost_freq(policy);
 	else if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
-		policy->min = CONFIG_MIN_FREQ_LP;
+		policy->min = min_freq_lp;
 	else
-		policy->min = CONFIG_MIN_FREQ_PERF;
+		policy->min = min_freq_hp;
 
 	return NOTIFY_OK;
 }
