@@ -15,10 +15,12 @@
 #include <linux/version.h>
 
 static unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
+static unsigned int wake_boost_duration = CONFIG_WAKE_BOOST_DURATION_MS;
 static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
 
 module_param(input_boost_duration, short, 0644);
+module_param(wake_boost_duration, uint, 0644);
 module_param(input_boost_freq_lp, uint, 0644);
 module_param(input_boost_freq_hp, uint, 0644);
 
@@ -233,7 +235,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb, unsigned long action,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK) {
 		clear_bit(SCREEN_OFF, &b->state);
-		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS);
+		__cpu_input_boost_kick_max(b, wake_boost_duration);
 	} else {
 		set_bit(SCREEN_OFF, &b->state);
 		wake_up(&b->boost_waitq);
