@@ -219,7 +219,7 @@ else
 	endif
 endif
 ifeq ($(LD),)
-ifneq ($(LLVM),)
+ifneq ($(LLVM),0)
 	ld-name = lld
 endif
 endif

@@ -370,7 +370,7 @@ HOST_LFS_CFLAGS := $(shell getconf LFS_CFLAGS 2>/dev/null)
 HOST_LFS_LDFLAGS := $(shell getconf LFS_LDFLAGS 2>/dev/null)
 HOST_LFS_LIBS := $(shell getconf LFS_LIBS 2>/dev/null)
 
-ifneq ($(LLVM),)
+ifneq ($(LLVM),0)
 HOSTCC	= clang
 HOSTCXX	= clang++
 else
@@ -390,7 +390,7 @@ endif
 
 # Make variables (CC, etc...)
 CPP		= $(CC) -E
-ifneq ($(LLVM),)
+ifneq ($(LLVM),0)
 CC		= clang
 LD		= ld.lld
 AR		= llvm-ar

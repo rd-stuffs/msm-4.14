@@ -7,7 +7,7 @@ ARCH := x86
 endif
 
 # always use the host compiler
-ifneq ($(LLVM),)
+ifneq ($(LLVM),0)
 HOSTAR	?= llvm-ar
 HOSTCC	?= clang
 HOSTLD	?= ld.lld

@@ -10,7 +10,7 @@ else
   CC_ARM32 := $(CROSS_COMPILE_COMPAT)$(cc-name)
 endif
 
-ifneq ($(LLVM),)
+ifneq ($(LLVM),0)
 LD_COMPAT ?= $(LD)
 else
 LD_COMPAT ?= $(CROSS_COMPILE_COMPAT)ld
