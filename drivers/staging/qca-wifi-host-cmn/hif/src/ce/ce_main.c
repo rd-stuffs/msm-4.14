@@ -4266,7 +4266,7 @@ int ce_get_index_info(struct hif_softc *scn, void *ce_state,
 void hif_log_ce_info(struct hif_softc *scn, uint8_t *data,
 		     unsigned int *offset)
 {
-	struct hang_event_info info = {0};
+	struct hang_event_info info = {};
 	static uint32_t tracked_ce = BIT(CE_ID_1) | BIT(CE_ID_2) |
 		BIT(CE_ID_3) | BIT(CE_ID_4) | BIT(CE_ID_9) | BIT(CE_ID_10);
 	uint8_t curr_index = 0;

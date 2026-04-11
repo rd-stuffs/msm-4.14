@@ -80,7 +80,7 @@ static ssize_t lpm_latency_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
 	int ret = 0;
-	struct kernel_param kp = {0};
+	struct kernel_param kp = {};
 	struct lpm_level_avail *avail = get_avail_ptr(kobj, attr);
 
 	if (WARN_ON(!avail))
@@ -101,7 +101,7 @@ ssize_t lpm_enable_show(struct kobject *kobj, struct kobj_attribute *attr,
 				char *buf)
 {
 	int ret = 0;
-	struct kernel_param kp = {0};
+	struct kernel_param kp = {};
 	struct lpm_level_avail *avail = get_avail_ptr(kobj, attr);
 
 	if (WARN_ON(!avail))
@@ -124,7 +124,7 @@ ssize_t lpm_enable_store(struct kobject *kobj, struct kobj_attribute *attr,
 				const char *buf, size_t len)
 {
 	int ret = 0;
-	struct kernel_param kp = {0};
+	struct kernel_param kp = {};
 	struct lpm_level_avail *avail;
 
 	avail = get_avail_ptr(kobj, attr);
@@ -214,7 +214,7 @@ static int create_cpu_lvl_nodes(struct lpm_cluster *p, struct kobject *parent)
 	int i, cpu_idx;
 	struct kobject **cpu_kobj = NULL;
 	struct lpm_level_avail *level_list = NULL;
-	char cpu_name[20] = {0};
+	char cpu_name[20] = {};
 	int ret = 0;
 	struct list_head *pos;
 
@@ -758,7 +758,7 @@ void cluster_dt_walkthrough(struct lpm_cluster *cluster)
 	struct lpm_cpu *cpu;
 	int i, j;
 	static int id;
-	char str[10] = {0};
+	char str[10] = {};
 
 	if (!cluster)
 		return;
