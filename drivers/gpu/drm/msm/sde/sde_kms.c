@@ -2812,7 +2812,9 @@ retry:
 	if (ret)
 		goto end;
 
-	drm_atomic_commit(state);
+	/* Ignore return value - atomic commit may fail but we continue cleanup */
+	ret = drm_atomic_commit(state);
+	(void)ret;
 end:
 	if (state)
 		drm_atomic_state_put(state);

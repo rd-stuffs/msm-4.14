@@ -216,6 +216,20 @@ enum sysctl_writes_mode {
 
 static enum sysctl_writes_mode sysctl_writes_strict = SYSCTL_WRITES_STRICT;
 
+#ifdef CONFIG_PELT_COMPATIBILITY_LAYER
+static unsigned int sysctl_sched_boost;
+static unsigned int sysctl_sched_prefer_spread;
+static unsigned int sysctl_sched_busy_hyst_enable_cpus;
+static unsigned int sysctl_sched_busy_hyst;
+static unsigned int sysctl_sched_group_upmigrate_pct;
+static unsigned int sysctl_sched_group_downmigrate_pct;
+static unsigned int sysctl_sched_ravg_window_nr_ticks;
+#endif
+
+#define LIB_PATH_LENGTH 512
+static char sched_lib_name[LIB_PATH_LENGTH];
+static unsigned int sched_lib_mask_force;
+
 static int sysctl_sched_lib_name_handler(struct ctl_table *table, int write,
                                          void __user *buffer, size_t *lenp,
                                          loff_t *ppos)

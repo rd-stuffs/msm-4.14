@@ -2270,7 +2270,7 @@ static int bq_charger_int(struct bq2597x *chip)
 	int ret;
 	chip->pinctrl = devm_pinctrl_get(chip->dev);
 	if (IS_ERR(chip->pinctrl)) {
-		pr_err("lct Couldn't get bq nit pinctrl rc=%d\n", PTR_ERR(chip->pinctrl));
+		pr_err("lct Couldn't get bq nit pinctrl rc=%ld\n", PTR_ERR(chip->pinctrl));
 		chip->pinctrl = NULL;
 	}
 

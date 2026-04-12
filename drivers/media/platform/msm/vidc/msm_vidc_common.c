@@ -3668,7 +3668,7 @@ int msm_comm_copy_bufreqs(struct msm_vidc_inst *inst, enum hal_buffer src_type,
 }
 
 struct hal_buffer_requirements *get_buff_req_buffer(
-		struct msm_vidc_inst *inst, enum hal_buffer buffer_type)
+		struct msm_vidc_inst *inst, u32 buffer_type)
 {
 	int i;
 

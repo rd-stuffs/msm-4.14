@@ -4776,14 +4776,14 @@ kgsl_get_unmapped_area(struct file *file, unsigned long addr,
 		if (IS_ERR_VALUE(val))
 			dev_err_ratelimited(device->dev,
 					       "get_unmapped_area: pid %d addr %lx pgoff %lx len %ld failed error %d\n",
-					       private->pid, addr, pgoff, len,
+					       pid_nr(private->pid), addr, pgoff, len,
 					       (int) val);
 	} else {
 		val = get_svm_unmapped_area(file, entry, addr, len, flags);
 		if (IS_ERR_VALUE(val))
 			dev_err_ratelimited(device->dev,
 					       "_get_svm_area: pid %d addr %lx pgoff %lx len %ld failed error %d\n",
-					       private->pid, addr, pgoff, len,
+					       pid_nr(private->pid), addr, pgoff, len,
 					       (int) val);
 	}
 

@@ -1985,6 +1985,7 @@ static int packet_sendmsg_spkt(struct socket *sock, struct msghdr *msg,
 	__be16 proto = 0;
 	int err;
 	int extra_len = 0;
+	char name[IFNAMSIZ];
 
 	/*
 	 *	Get and verify the address.
@@ -2002,10 +2003,11 @@ static int packet_sendmsg_spkt(struct socket *sock, struct msghdr *msg,
 	 *	Find the device first to size check it
 	 */
 
-	saddr->spkt_device[sizeof(saddr->spkt_device) - 1] = 0;
+	memset(name, 0, sizeof(name));
+	memcpy(name, saddr->spkt_device, sizeof(saddr->spkt_device));
 retry:
 	rcu_read_lock();
-	dev = dev_get_by_name_rcu(sock_net(sk), saddr->spkt_device);
+	dev = dev_get_by_name_rcu(sock_net(sk), name);
 	err = -ENODEV;
 	if (dev == NULL)
 		goto out_unlock;

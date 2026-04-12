@@ -728,7 +728,7 @@ static int cp_flash2_charge(unsigned int port)
 			sys_config.ibat_minus_deviation_val = 1050;
 			sys_config.ibat_plus_deviation_val = 50;
 			pm_state.batt_cell_volt_triggered = true;
-			pr_debug("batt cell volt > 4200mv or batt soc > 29%, modify bq qc3 adjust parameters\n");
+			pr_debug("batt cell volt > 4200mv or batt soc > 29 percent, modify bq qc3 adjust parameters\n");
 		}
 	}
 

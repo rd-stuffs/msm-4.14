@@ -3816,7 +3816,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	err = ufshcd_get_read_lock(hba, cmd->device->lun);
 	if (unlikely(err < 0)) {
 		if (err == -EPERM) {
-			err == SCSI_MLQUEUE_HOST_BUSY;
+			err = SCSI_MLQUEUE_HOST_BUSY;
 			goto out_pm_qos;
 		}
 		if (err == -EAGAIN) {
@@ -3941,7 +3941,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	if (err) {
 		if (err != -EAGAIN)
 			dev_err(hba->dev,
-				"%s: failed to compose upiu %d cmd:0x%08x lun:%d\n",
+				"%s: failed to compose upiu %d cmd:%p lun:%d\n",
 				__func__, err, cmd, lrbp->lun);
 
 		lrbp->cmd = NULL;

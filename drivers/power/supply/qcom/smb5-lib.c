@@ -5239,14 +5239,14 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 	if (!chg->pd) {
 		chg->pd = devm_usbpd_get_by_phandle(chg->dev,
 				"qcom,usbpd-phandle");
-		pr_err("1:chg->pd=%x\n", chg->pd);
+		pr_err("1:chg->pd=%pK\n", chg->pd);
 		if (IS_ERR_OR_NULL(chg->pd))
 			pr_err("Failed to get pd handle %ld\n",
 					PTR_ERR(chg->pd));
-		
+
 	}
 
-	pr_err("2:chg->pd=%x\n", chg->pd);
+	pr_err("2:chg->pd=%pK\n", chg->pd);
 	update_sw_icl_max(chg, apsd->pst);
 
 	if (chg->pd_active) {
@@ -5940,7 +5940,8 @@ unsuspend_input:
 		vote(chg->usb_icl_votable, QC2_UNSUPPORTED_VOTER, true,
 				QC2_UNSUPPORTED_UA);
 		chg->qc2_unsupported = true;
-		pr_err("[%s] enter! qc2_unsupported=%d\n", chg->qc2_unsupported);
+		pr_err("[%s] enter! qc2_unsupported=%d\n", __func__,
+		       chg->qc2_unsupported);
 	}
 
 	return IRQ_HANDLED;
@@ -6054,9 +6055,10 @@ static int check_reduce_fcc_condition(struct smb_charger *chg)
 
 	if (!chg->cp_psy) {
 		chg->cp_psy = power_supply_get_by_name("bq2597x-standalone");
-		if (!chg->cp_psy)
+		if (!chg->cp_psy) {
 			pr_err("cp_psy not found\n");
 			return 0;
+		}
 	}
 
 	rc = power_supply_get_property(chg->cp_psy,
@@ -6847,7 +6849,7 @@ static void smblib_handle_hvdcp_3p0_auth_done(struct smb_charger *chg,
 		if (!chg->apsd_ext_timeout &&
 				!timer_pending(&chg->apsd_timer)) {
 			smblib_dbg(chg, PR_MISC,
-				"APSD Extented timer started at %lld\n",
+				"APSD Extented timer started at %u\n",
 				jiffies_to_msecs(jiffies));
 
 			mod_timer(&chg->apsd_timer,
@@ -8959,7 +8961,7 @@ static void apsd_timer_cb(unsigned long data)
 {
 	struct smb_charger *chg = (struct smb_charger *)data;
 
-	smblib_dbg(chg, PR_MISC, "APSD Extented timer timeout at %lld\n",
+	smblib_dbg(chg, PR_MISC, "APSD Extented timer timeout at %u\n",
 			jiffies_to_msecs(jiffies));
 
 	chg->apsd_ext_timeout = true;

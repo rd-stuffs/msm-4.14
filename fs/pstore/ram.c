@@ -38,11 +38,7 @@
 
 #define RAMOOPS_KERNMSG_HDR "===="
 #define MIN_MEM_SIZE 4096UL
-#if __BITS_PER_LONG == 64
-# define TVSEC_FMT "%ld"
-#else
-# define TVSEC_FMT "%lld"
-#endif
+#define TVSEC_FMT "%lld"
 
 static ulong record_size = MIN_MEM_SIZE;
 module_param(record_size, ulong, 0400);
