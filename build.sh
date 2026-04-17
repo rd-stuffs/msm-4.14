@@ -7,35 +7,38 @@ set -euo pipefail
 
 trap 'printf "\nInterrupted.\n"; exit 1' INT
 
+WD="$(pwd)"
 ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
-LLVM_REV="22"
-TC_DIR="$(pwd)/tc/clang-$LLVM_REV"
-AK3_DIR="$(pwd)/AnyKernel3"
 DEFCONFIG="surya_defconfig"
 
+CLANG_REV="22"
+CLANG_DIR="$WD/tc/clang-$CLANG_REV"
+CLANG_URL="https://bitbucket.org/rdxzv/clang-standalone"
+
+AK3_DIR="$WD/AnyKernel3"
+AK3_URL="https://github.com/rd-stuffs/AnyKernel3"
+
 if git rev-parse --is-inside-work-tree &>/dev/null; then
-	sha=$(git rev-parse --verify HEAD)
-	ZIPNAME="${ZIPNAME::-4}-${sha:0:8}.zip"
+	SHA=$(git rev-parse --verify HEAD)
+	ZIPNAME="${ZIPNAME::-4}-${SHA:0:8}.zip"
 fi
 
 export PATH="$TC_DIR/bin:$PATH"
 
-if [ ! -d "$TC_DIR" ]; then
-	printf "Cloning Slim LLVM to %s...\n" "$TC_DIR"
-	git clone --depth=1 -b "$LLVM_REV" \
-		https://bitbucket.org/rdxzv/clang-standalone.git "$TC_DIR"
+if [ ! -d "$CLANG_DIR" ]; then
+	printf "Cloning Slim LLVM to %s...\n" "$CLANG_DIR"
+	git clone --depth=1 -b $CLANG_REV "$CLANG_URL" "$CLANG_DIR"
 fi
 
 if [ ! -d "$AK3_DIR" ]; then
 	printf "Cloning AnyKernel3 to %s...\n" "$AK3_DIR"
-	git clone --depth=1 -b FSociety \
-		https://github.com/rd-stuffs/AnyKernel3.git "$AK3_DIR"
+	git clone --depth=1 -b FSociety "$AK3_URL" "$AK3_DIR"
 fi
 
 if [[ ${1:-} == -rf || ${1:-} == --regen-full ]]; then
-	make "$DEFCONFIG"
-	cp out/.config arch/arm64/configs/"$DEFCONFIG"
-	printf "\nSuccessfully regenerated full defconfig at %s\n" "$DEFCONFIG"
+	make $DEFCONFIG
+	cp out/.config arch/arm64/configs/$DEFCONFIG
+	printf "\nSuccessfully regenerated full defconfig at %s\n" $DEFCONFIG
 	exit
 fi
 
@@ -63,7 +66,7 @@ if [[ $CLEAN == "true" ]]; then
 fi
 
 printf "Building surya defconfig...\n"
-make "$DEFCONFIG" &>/dev/null
+make $DEFCONFIG &>/dev/null
 
 if [[ $KSU == "true" ]]; then
 	printf "Building KernelSU variant...\n"
@@ -89,7 +92,7 @@ fi
 printf "\nKernel compiled successfully! Zipping up...\n"
 cp "$kernel" "$dtbo" "$dtbo_miui" "$AK3_DIR"
 cd "$AK3_DIR"
-zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md \*placeholder &>/dev/null
+zip -r9 "../$ZIPNAME" ./* -x .git modules\* patch\* ramdisk\* README.md \*placeholder &>/dev/null
 rm -f Image.gz-dtb dtbo.img dtbo-miui.img
 cd ..
 printf "\nCompleted in %d minute(s) and %d second(s)!\n" $((BUILD_TIME / 60)) $((BUILD_TIME % 60))
