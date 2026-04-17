@@ -3291,9 +3291,6 @@ u64 approximate_runtime(unsigned long util)
 	struct sched_avg sa = {};
 	u64 runtime = 0;
 
-	if (unlikely(!util))
-		return runtime;
-
 	while (sa.util_avg < util) {
 		sa.util_sum = decay_load(sa.util_sum, 1);
 		sa.util_sum += (u64)__accumulate_pelt_segments(1, 1024, 0) <<
