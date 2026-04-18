@@ -13,41 +13,70 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """Tool for packing multiple DTB/DTBO files into a single image"""
+
+from __future__ import print_function
 
 import argparse
 import fnmatch
 import os
 import struct
+import subprocess
 import zlib
 from array import array
 from collections import namedtuple
+from contextlib import ExitStack
 from sys import stdout
 
-class CompressionFormat:
+MAX_CUSTOM_FIELDS = 11
+
+class CompressionFormat(object):
     """Enum representing DT compression format for a DT entry.
     """
     NO_COMPRESSION = 0x00
     ZLIB_COMPRESSION = 0x01
     GZIP_COMPRESSION = 0x02
+    LZ4_COMPRESSION = 0x03
 
-class DtEntry:
+class DtEntry(object):
     """Provides individual DT image file arguments to be added to a DTBO.
 
     Attributes:
-        REQUIRED_KEYS_V0: 'keys' needed to be present in the dictionary passed to instantiate
-            an object of this class when a DTBO header of version 0 is used.
-        REQUIRED_KEYS_V1: 'keys' needed to be present in the dictionary passed to instantiate
-            an object of this class when a DTBO header of version 1 is used.
-        COMPRESSION_FORMAT_MASK: Mask to retrieve compression info for DT entry from flags field
-            when a DTBO header of version 1 is used.
+        COMPRESSION_FORMAT_MASK: Mask to retrieve compression info for DT entry
+            from flags field when a DTBO header of version 1 is used.
     """
     COMPRESSION_FORMAT_MASK = 0x0f
-    REQUIRED_KEYS_V0 = ('dt_file', 'dt_size', 'dt_offset', 'id', 'rev',
-                     'custom0', 'custom1', 'custom2', 'custom3')
-    REQUIRED_KEYS_V1 = ('dt_file', 'dt_size', 'dt_offset', 'id', 'rev',
-                     'flags', 'custom0', 'custom1', 'custom2')
+
+    @classmethod
+    def get_num_custom_fields(cls, version):
+        """Returns the number of custom fields for a given DTBO version."""
+        num_custom_fields = {
+            0: 4,
+            1: 3,
+            2: MAX_CUSTOM_FIELDS,
+        }
+        num = num_custom_fields.get(version)
+        if num is None:
+            raise ValueError(f'Unsupported version: {version}')
+        assert num <= MAX_CUSTOM_FIELDS
+        return num
+
+    @classmethod
+    def get_required_keys(cls, version):
+        """Returns the required keys for a given DTBO version.
+
+        Args:
+            version: The DTBO version.
+
+        Returns:
+            A tuple of required keys.
+        """
+        keys = ['dt_file', 'dt_size', 'dt_offset', 'id', 'rev']
+        if version in (1, 2):
+            keys.append('flags')
+        num_custom = cls.get_num_custom_fields(version)
+        keys.extend([f'custom{i}' for i in range(num_custom)])
+        return tuple(keys)
 
     @staticmethod
     def __get_number_or_prop(arg):
@@ -87,52 +116,39 @@ class DtEntry:
         """
 
         self.__version = kwargs['version']
-        required_keys = None
-        if self.__version == 0:
-            required_keys = self.REQUIRED_KEYS_V0
-        elif self.__version == 1:
-            required_keys = self.REQUIRED_KEYS_V1
+        required_keys = self.get_required_keys(self.__version)
 
         missing_keys = set(required_keys) - set(kwargs)
         if missing_keys:
-            raise ValueError('Missing keys in DtEntry constructor: %r' %
-                             sorted(missing_keys))
+            raise ValueError(
+                f'Missing keys in DtEntry constructor: '
+                f'{sorted(missing_keys)!r}')
 
         self.__dt_file = kwargs['dt_file']
         self.__dt_offset = kwargs['dt_offset']
         self.__dt_size = kwargs['dt_size']
         self.__id = self.__get_number_or_prop(kwargs['id'])
         self.__rev = self.__get_number_or_prop(kwargs['rev'])
-        if self.__version == 1:
+        if self.__version in (1, 2):
             self.__flags = self.__get_number_or_prop(kwargs['flags'])
-        self.__custom0 = self.__get_number_or_prop(kwargs['custom0'])
-        self.__custom1 = self.__get_number_or_prop(kwargs['custom1'])
-        self.__custom2 = self.__get_number_or_prop(kwargs['custom2'])
-        if self.__version == 0:
-            self.__custom3 = self.__get_number_or_prop(kwargs['custom3'])
+
+        num_custom = self.get_num_custom_fields(self.__version)
+        self.__custom = tuple(
+            self.__get_number_or_prop(kwargs[f'custom{i}'])
+            for i in range(num_custom)
+        )
 
     def __str__(self):
         sb = []
-        sb.append('{key:>20} = {value:d}'.format(key='dt_size',
-                                                 value=self.__dt_size))
-        sb.append('{key:>20} = {value:d}'.format(key='dt_offset',
-                                                 value=self.__dt_offset))
-        sb.append('{key:>20} = {value:08x}'.format(key='id',
-                                                   value=self.__id))
-        sb.append('{key:>20} = {value:08x}'.format(key='rev',
-                                                   value=self.__rev))
-        if self.__version == 1:
-            sb.append('{key:>20} = {value:08x}'.format(key='flags',
-                                                       value=self.__flags))
-        sb.append('{key:>20} = {value:08x}'.format(key='custom[0]',
-                                                   value=self.__custom0))
-        sb.append('{key:>20} = {value:08x}'.format(key='custom[1]',
-                                                   value=self.__custom1))
-        sb.append('{key:>20} = {value:08x}'.format(key='custom[2]',
-                                                   value=self.__custom2))
-        if self.__version == 0:
-            sb.append('{key:>20} = {value:08x}'.format(key='custom[3]',
-                                                       value=self.__custom3))
+        sb.append(f'{"dt_size":>20} = {self.__dt_size:d}')
+        sb.append(f'{"dt_offset":>20} = {self.__dt_offset:d}')
+        sb.append(f'{"id":>20} = {self.__id:08x}')
+        sb.append(f'{"rev":>20} = {self.__rev:08x}')
+        if self.__version in (1, 2):
+            sb.append(f'{"flags":>20} = {self.__flags:08x}')
+        for i, val in enumerate(self.__custom):
+            key = f"custom[{i}]"
+            sb.append(f'{key:>20} = {val:08x}')
         return '\n'.join(sb)
 
     def compression_info(self):
@@ -185,28 +201,12 @@ class DtEntry:
         return self.__flags
 
     @property
-    def custom0(self):
-        """int: DT entry _custom0 for this DT image."""
-        return self.__custom0
+    def custom(self):
+        """tuple of int: DT entry custom fields for this DT image."""
+        return self.__custom
 
-    @property
-    def custom1(self):
-        """int: DT entry _custom1 for this DT image."""
-        return self.__custom1
-
-    @property
-    def custom2(self):
-        """int: DT entry custom2 for this DT image."""
-        return self.__custom2
-
-    @property
-    def custom3(self):
-        """int: DT entry custom3 for this DT image."""
-        return self.__custom3
-
-class Dtbo:
-    """
-    Provides parser, reader, writer for dumping and creating Device Tree Blob
+class Dtbo(object):
+    """Provides parser, reader, writer for dumping and creating Device Tree Blob
     Overlay (DTBO) images.
 
     Attributes:
@@ -214,9 +214,9 @@ class Dtbo:
         _ACPIO_MAGIC: Advanced Configuration and Power Interface table header
                       magic.
         _DT_TABLE_HEADER_SIZE: Size of Device tree table header.
-        _DT_TABLE_HEADER_INTS: Number of integers in DT table header.
-        _DT_ENTRY_HEADER_SIZE: Size of Device tree entry header within a DTBO.
-        _DT_ENTRY_HEADER_INTS: Number of integers in DT entry header.
+        _DT_ENTRY_HEADER_SIZE: Size of v0/v1 Device tree entry header.
+        _DT_ENTRY_HEADER_V2_SIZE: Size of v2 Device tree entry header.
+        _BYTES_PER_INT: Number of bytes per 32-bit integer.
         _GZIP_COMPRESSION_WBITS: Argument 'wbits' for gzip compression
         _ZLIB_DECOMPRESSION_WBITS: Argument 'wbits' for zlib/gzip compression
     """
@@ -224,11 +224,20 @@ class Dtbo:
     _DTBO_MAGIC = 0xd7b7ab1e
     _ACPIO_MAGIC = 0x41435049
     _DT_TABLE_HEADER_SIZE = struct.calcsize('>8I')
-    _DT_TABLE_HEADER_INTS = 8
     _DT_ENTRY_HEADER_SIZE = struct.calcsize('>8I')
-    _DT_ENTRY_HEADER_INTS = 8
+    _DT_ENTRY_HEADER_V2_SIZE = struct.calcsize('>16I')
+    _BYTES_PER_INT = 4
     _GZIP_COMPRESSION_WBITS = 31
     _ZLIB_DECOMPRESSION_WBITS = 47
+
+    @classmethod
+    def _get_dt_entry_size(cls, version):
+        if version in (0, 1):
+            return cls._DT_ENTRY_HEADER_SIZE
+        elif version == 2:
+            return cls._DT_ENTRY_HEADER_V2_SIZE
+        else:
+            raise ValueError(f'Unsupported version: {version}')
 
     def _update_dt_table_header(self):
         """Converts header entries into binary data for DTBO header.
@@ -255,16 +264,22 @@ class Dtbo:
                 be found in the resulting DTBO image.
         """
         if self.version == 0:
-            struct.pack_into('>8I', self.__metadata, metadata_offset, dt_entry.size,
-                             dt_entry.dt_offset, dt_entry.image_id, dt_entry.rev,
-                             dt_entry.custom0, dt_entry.custom1, dt_entry.custom2,
-                             dt_entry.custom3)
+            struct.pack_into('>8I', self.__metadata, metadata_offset,
+                             dt_entry.size, dt_entry.dt_offset,
+                             dt_entry.image_id, dt_entry.rev,
+                             *dt_entry.custom)
         elif self.version == 1:
-            struct.pack_into('>8I', self.__metadata, metadata_offset, dt_entry.size,
-                             dt_entry.dt_offset, dt_entry.image_id, dt_entry.rev,
-                             dt_entry.flags, dt_entry.custom0, dt_entry.custom1,
-                             dt_entry.custom2)
-
+            struct.pack_into('>8I', self.__metadata, metadata_offset,
+                             dt_entry.size, dt_entry.dt_offset,
+                             dt_entry.image_id, dt_entry.rev,
+                             dt_entry.flags, *dt_entry.custom)
+        elif self.version == 2:
+            struct.pack_into('>16I', self.__metadata, metadata_offset,
+                             dt_entry.size, dt_entry.dt_offset,
+                             dt_entry.image_id, dt_entry.rev,
+                             dt_entry.flags, *dt_entry.custom)
+        else:
+            raise ValueError(f'Unsupported version for packing: {self.version}')
 
     def _update_metadata(self):
         """Updates the DTBO metadata.
@@ -295,48 +310,49 @@ class Dtbo:
          self.page_size, self.version) = struct.unpack_from('>8I', buf, 0)
 
         # verify the header
-        if self.magic != self._DTBO_MAGIC and self.magic != self._ACPIO_MAGIC:
-            raise ValueError('Invalid magic number 0x%x in DTBO/ACPIO file' %
-                             (self.magic))
+        if self.magic not in (self._DTBO_MAGIC, self._ACPIO_MAGIC):
+            raise ValueError(f'Invalid magic number 0x{self.magic:x} in '
+                             'DTBO/ACPIO file')
 
         if self.header_size != self._DT_TABLE_HEADER_SIZE:
-            raise ValueError('Invalid header size (%d) in DTBO/ACPIO file' %
-                             (self.header_size))
+            raise ValueError(f'Invalid header size ({self.header_size:d}) in '
+                             'DTBO/ACPIO file')
 
-        if self.dt_entry_size != self._DT_ENTRY_HEADER_SIZE:
-            raise ValueError('Invalid DT entry header size (%d) in DTBO/ACPIO file' %
-                             (self.dt_entry_size))
+        if self.dt_entry_size != self._get_dt_entry_size(self.version):
+            raise ValueError(
+                f'Invalid DT entry header size ({self.dt_entry_size:d}) in '
+                'DTBO/ACPIO file')
 
     def _read_dt_entries_from_metadata(self):
         """Reads individual DT entry headers from metadata buffer.
 
         Unpack and read the DTBO DT entry headers from the internal buffer.
         The buffer size must exactly be equal to _DT_TABLE_HEADER_SIZE +
-        (_DT_ENTRY_HEADER_SIZE * dt_entry_count). The method raises exception
+        (dt_entry_size * dt_entry_count). The method raises exception
         if DT entries have already been set for this object.
         """
 
         if self.__dt_entries:
             raise ValueError('DTBO DT entries can be added only once')
 
-        offset = self.dt_entries_offset // 4
+        offset = self.dt_entries_offset // self._BYTES_PER_INT
         params = {}
         params['version'] = self.version
         params['dt_file'] = None
-        for i in range(0, self.dt_entry_count):
-            dt_table_entry = self.__metadata[offset:offset + self._DT_ENTRY_HEADER_INTS]
+
+        assert self.dt_entry_size % self._BYTES_PER_INT == 0
+        dt_entry_ints = self.dt_entry_size // self._BYTES_PER_INT
+
+        for _ in range(0, self.dt_entry_count):
+            dt_table_entry = self.__metadata[offset:offset + dt_entry_ints]
             params['dt_size'] = dt_table_entry[0]
             params['dt_offset'] = dt_table_entry[1]
-            for j in range(2, self._DT_ENTRY_HEADER_INTS):
-                required_keys = None
-                if self.version == 0:
-                    required_keys = DtEntry.REQUIRED_KEYS_V0
-                elif self.version == 1:
-                    required_keys = DtEntry.REQUIRED_KEYS_V1
+            required_keys = DtEntry.get_required_keys(self.version)
+            for j in range(2, dt_entry_ints):
                 params[required_keys[j + 1]] = str(dt_table_entry[j])
             dt_entry = DtEntry(**params)
             self.__dt_entries.append(dt_entry)
-            offset += self._DT_ENTRY_HEADER_INTS
+            offset += dt_entry_ints
 
     def _read_dtbo_image(self):
         """Parse the input file and instantiate this object."""
@@ -353,18 +369,31 @@ class Dtbo:
         self.__metadata_size = (self.header_size +
                                 self.dt_entry_count * self.dt_entry_size)
         if file_size < self.__metadata_size:
-            raise ValueError('Invalid or truncated DTBO file of size %d expected %d' %
-                             file_size, self.__metadata_size)
+            raise ValueError(
+                f'Invalid or truncated DTBO file of size {file_size:d} '
+                f'expected {self.__metadata_size:d}')
 
-        num_ints = (self._DT_TABLE_HEADER_INTS +
-                    self.dt_entry_count * self._DT_ENTRY_HEADER_INTS)
+        assert self._DT_TABLE_HEADER_SIZE % self._BYTES_PER_INT == 0
+        dt_header_ints = self._DT_TABLE_HEADER_SIZE // self._BYTES_PER_INT
+        assert self.dt_entry_size % self._BYTES_PER_INT == 0
+        dt_entry_ints = self.dt_entry_size // self._BYTES_PER_INT
+
+        num_ints = dt_header_ints + self.dt_entry_count * dt_entry_ints
         if self.dt_entries_offset > self._DT_TABLE_HEADER_SIZE:
-            num_ints += (self.dt_entries_offset - self._DT_TABLE_HEADER_SIZE) / 4
+            num_ints += ((self.dt_entries_offset - self._DT_TABLE_HEADER_SIZE)
+                         // self._BYTES_PER_INT)
         format_str = '>' + str(num_ints) + 'I'
         self.__file.seek(0)
         self.__metadata = struct.unpack(format_str,
                                         self.__file.read(self.__metadata_size))
         self._read_dt_entries_from_metadata()
+
+    def _write_padding_bytes(self):
+        """Append padding bytes to align DTB/DTBO img to the next page size"""
+        padding_size = (self.page_size - (self.total_size % self.page_size)) % self.page_size
+        if padding_size:
+            padding_data = b'\x00' * padding_size
+            self.__file.write(padding_data)
 
     def _find_dt_entry_with_same_file(self, dt_entry):
         """Finds DT Entry that has identical backing DT file.
@@ -407,11 +436,11 @@ class Dtbo:
                 self.magic = self._DTBO_MAGIC
             self.total_size = self._DT_TABLE_HEADER_SIZE
             self.header_size = self._DT_TABLE_HEADER_SIZE
-            self.dt_entry_size = self._DT_ENTRY_HEADER_SIZE
+            self.version = version
+            self.dt_entry_size = self._get_dt_entry_size(self.version)
             self.dt_entry_count = 0
             self.dt_entries_offset = self._DT_TABLE_HEADER_SIZE
             self.page_size = page_size
-            self.version = version
             self.__metadata_size = self._DT_TABLE_HEADER_SIZE
         else:
             self._read_dtbo_image()
@@ -423,11 +452,9 @@ class Dtbo:
                  'dt_entry_count', 'dt_entries_offset', 'page_size', 'version')
         for key in _keys:
             if key == 'magic':
-                sb.append('{key:>20} = {value:08x}'.format(key=key,
-                                                           value=self.__dict__[key]))
+                sb.append(f'{key:>20} = {self.__dict__[key]:08x}')
             else:
-                sb.append('{key:>20} = {value:d}'.format(key=key,
-                                                         value=self.__dict__[key]))
+                sb.append(f'{key:>20} = {self.__dict__[key]:d}')
         count = 0
         for dt_entry in self.__dt_entries:
             sb.append(f'dt_table_entry[{count:d}]:')
@@ -454,19 +481,31 @@ class Dtbo:
             ValueError if unrecognized compression format is found.
         """
         compress_zlib = zlib.compressobj()  #  zlib
-        compress_gzip = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
-                                         zlib.DEFLATED, self._GZIP_COMPRESSION_WBITS)  #  gzip
+        compress_gzip = zlib.compressobj(
+            zlib.Z_DEFAULT_COMPRESSION, zlib.DEFLATED,
+            self._GZIP_COMPRESSION_WBITS)  #  gzip
         compression_obj_dict = {
             CompressionFormat.NO_COMPRESSION: None,
             CompressionFormat.ZLIB_COMPRESSION: compress_zlib,
             CompressionFormat.GZIP_COMPRESSION: compress_gzip,
+            CompressionFormat.LZ4_COMPRESSION: None,
         }
 
         if compression_format not in compression_obj_dict:
-            ValueError("Bad compression format %d" % compression_format)
+            raise ValueError(f"Bad compression format {compression_format:d}")
 
         if compression_format is CompressionFormat.NO_COMPRESSION:
             dt_entry = dt_entry_file.read()
+        elif compression_format is CompressionFormat.LZ4_COMPRESSION:
+            dt_entry_file.seek(0)
+            compression_cmd = ['lz4', '-12', '--favor-decSpeed']
+            result = subprocess.run(compression_cmd, check=True,
+                                    input=dt_entry_file.read(),
+                                    capture_output=True)
+            if result.stderr:
+                dt_entry = None
+            else:
+                dt_entry = result.stdout
         else:
             compression_object = compression_obj_dict[compression_format]
             dt_entry_file.seek(0)
@@ -487,8 +526,8 @@ class Dtbo:
             A buffer containing all DT entries.
 
         Raises:
-            ValueError: if the list of DT entries is empty or if a list of DT entries
-                has already been added to the DTBO.
+            ValueError: if the list of DT entries is empty or if a list of DT
+                entries has already been added to the DTBO.
         """
         if not dt_entries:
             raise ValueError('Attempted to add empty list of DT entries')
@@ -506,13 +545,14 @@ class Dtbo:
                 raise ValueError('Adding invalid DT entry object to DTBO')
             entry = self._find_dt_entry_with_same_file(dt_entry)
             dt_entry_compression_info = dt_entry.compression_info()
-            if entry and (entry.compression_info() == dt_entry_compression_info):
+            if entry and (entry.compression_info() ==
+                          dt_entry_compression_info):
                 dt_entry.dt_offset = entry.dt_offset
                 dt_entry.size = entry.size
             else:
                 dt_entry.dt_offset = dt_offset
-                compressed_entry, dt_entry.size = self.compress_dt_entry(dt_entry_compression_info,
-                                                                         dt_entry.dt_file)
+                compressed_entry, dt_entry.size = self.compress_dt_entry(
+                    dt_entry_compression_info, dt_entry.dt_file)
                 dt_entry_buf += compressed_entry
                 dt_offset += dt_entry.size
                 self.total_size += dt_entry.size
@@ -531,14 +571,15 @@ class Dtbo:
         Args:
             idx: Index of the DT entry in the DTBO file.
             fout: File handle where the DTB at index idx to be extracted into.
-            decompress: If a DT entry is compressed, decompress it before writing
-                it to the file handle.
+            decompress: If a DT entry is compressed, decompress it before
+                writing it to the file handle.
 
         Raises:
-            ValueError: if invalid DT entry index or compression format is detected.
+            ValueError: if invalid DT entry index or compression format is
+                detected.
         """
         if idx > self.dt_entry_count:
-            raise ValueError('Invalid index %d of DtEntry' % idx)
+            raise ValueError(f'Invalid index {idx:d} of DtEntry')
 
         size = self.dt_entries[idx].size
         offset = self.dt_entries[idx].dt_offset
@@ -546,9 +587,17 @@ class Dtbo:
         fout.seek(0)
         compression_format = self.dt_entries[idx].compression_info()
         if decompress and compression_format:
-            if (compression_format == CompressionFormat.ZLIB_COMPRESSION or
-                compression_format == CompressionFormat.GZIP_COMPRESSION):
-                fout.write(zlib.decompress(self.__file.read(size), self._ZLIB_DECOMPRESSION_WBITS))
+            if compression_format in (CompressionFormat.ZLIB_COMPRESSION,
+                                      CompressionFormat.GZIP_COMPRESSION):
+                fout.write(zlib.decompress(
+                    self.__file.read(size), self._ZLIB_DECOMPRESSION_WBITS))
+            elif compression_format == CompressionFormat.LZ4_COMPRESSION:
+                decompression_cmd = ['lz4', '-d', '-c']
+                result = subprocess.run(decompression_cmd, check=False,
+                                        input=self.__file.read(size),
+                                        capture_output=True)
+                if not result.stderr:
+                    fout.write(result.stdout)
             else:
                 raise ValueError("Unknown compression format detected")
         else:
@@ -569,13 +618,15 @@ class Dtbo:
             raise ValueError('No file given to write to.')
 
         if not self.__dt_entries:
-            raise ValueError('No DT image files to embed into DTBO image given.')
+            raise ValueError(
+                'No DT image files to embed into DTBO image given.')
 
         self._update_metadata()
 
         self.__file.seek(0)
         self.__file.write(self.__metadata)
         self.__file.write(dt_entry_buf)
+        self._write_padding_bytes()
         self.__file.flush()
 
 
@@ -605,18 +656,10 @@ def parse_dt_entry(global_args, arglist):
     parser.add_argument('--flags', type=str, dest='flags',
                         action='store',
                         default=global_args.global_flags)
-    parser.add_argument('--custom0', type=str, dest='custom0',
-                        action='store',
-                        default=global_args.global_custom0)
-    parser.add_argument('--custom1', type=str, dest='custom1',
-                        action='store',
-                        default=global_args.global_custom1)
-    parser.add_argument('--custom2', type=str, dest='custom2',
-                        action='store',
-                        default=global_args.global_custom2)
-    parser.add_argument('--custom3', type=str, dest='custom3',
-                        action='store',
-                        default=global_args.global_custom3)
+    for i in range(MAX_CUSTOM_FIELDS):
+        parser.add_argument(f'--custom{i}', type=str, dest=f'custom{i}',
+                            action='store',
+                            default=getattr(global_args, f'global_custom{i}'))
     return parser.parse_args(arglist)
 
 
@@ -674,9 +717,9 @@ def parse_config_option(line, is_global, dt_keys, global_key_types):
             specific option.
         dt_keys: Tuple containing all valid DT entry and global option strings
             in configuration file.
-        global_key_types: A dict of global options and their corresponding types. It
-            contains all exclusive valid global option strings in configuration
-            file that are not repeated in dt entry options.
+        global_key_types: A dict of global options and their corresponding
+            types. It contains all exclusive valid global option strings in
+            configuration file that are not repeated in dt entry options.
 
     Returns:
         Returns a tuple for parsed key and value for the option. Also, checks
@@ -684,14 +727,18 @@ def parse_config_option(line, is_global, dt_keys, global_key_types):
     """
 
     if line.find('=') == -1:
-        raise ValueError('Invalid line (%s) in configuration file' % line)
+        raise ValueError(f'Invalid line ({line}) in configuration file')
 
     key, value = (x.strip() for x in line.split('='))
     if is_global and key in global_key_types:
         if global_key_types[key] is int:
-            value = int(value)
+            if value.startswith('0x') or value.startswith('0X'):
+                base = 16
+            else:
+                base = 10
+            value = int(value, base)
     elif key not in dt_keys:
-        raise ValueError('Invalid option (%s) in configuration file' % key)
+        raise ValueError(f'Invalid option ({key}) in configuration file')
 
     return key, value
 
@@ -704,9 +751,9 @@ def parse_config_file(fin, dt_keys, global_key_types):
             specific option.
         dt_keys: Tuple containing all valid DT entry and global option strings
             in configuration file.
-        global_key_types: A dict of global options and their corresponding types. It
-            contains all exclusive valid global option strings in configuration
-            file that are not repeated in dt entry options.
+        global_key_types: A dict of global options and their corresponding
+            types. It contains all exclusive valid global option strings in
+            configuration file that are not repeated in dt entry options.
 
     Returns:
         global_args, dt_args: Tuple of a dictionary with global arguments
@@ -723,7 +770,7 @@ def parse_config_file(fin, dt_keys, global_key_types):
     """
 
     # set all global defaults
-    global_args = {k: '0' for k in dt_keys}
+    global_args = dict((k, '0') for k in dt_keys)
     global_args['dt_type'] = 'dtb'
     global_args['page_size'] = 2048
     global_args['version'] = 0
@@ -741,10 +788,12 @@ def parse_config_file(fin, dt_keys, global_key_types):
             continue
         if line.startswith((' ', '\t')) and not found_dt_entry:
             # This is a global argument
-            key, value = parse_config_option(line, True, dt_keys, global_key_types)
+            key, value = parse_config_option(
+                line, True, dt_keys, global_key_types)
             global_args[key] = value
         elif line.find('=') != -1:
-            key, value = parse_config_option(line, False, dt_keys, global_key_types)
+            key, value = parse_config_option(
+                line, False, dt_keys, global_key_types)
             dt_args[-1][key] = value
         else:
             found_dt_entry = True
@@ -785,14 +834,9 @@ def parse_create_args(arg_list):
                         action='store', default='0')
     parser.add_argument('--flags', type=str, dest='global_flags',
                         action='store', default='0')
-    parser.add_argument('--custom0', type=str, dest='global_custom0',
-                        action='store', default='0')
-    parser.add_argument('--custom1', type=str, dest='global_custom1',
-                        action='store', default='0')
-    parser.add_argument('--custom2', type=str, dest='global_custom2',
-                        action='store', default='0')
-    parser.add_argument('--custom3', type=str, dest='global_custom3',
-                        action='store', default='0')
+    for i in range(MAX_CUSTOM_FIELDS):
+        parser.add_argument(f'--custom{i}', type=str, dest=f'global_custom{i}',
+                            action='store', default='0')
     args = parser.parse_args(argv)
     return args, remainder
 
@@ -848,7 +892,8 @@ def create_dtbo_image(fout, argv):
     if not remainder:
         raise ValueError('List of dtimages to add to DTBO not provided')
     dt_entries = parse_dt_entries(global_args, remainder)
-    dtbo = Dtbo(fout, global_args.dt_type, global_args.page_size, global_args.version)
+    dtbo = Dtbo(fout, global_args.dt_type, global_args.page_size,
+                global_args.version)
     dt_entry_buf = dtbo.add_dt_entries(dt_entries)
     dtbo.commit(dt_entry_buf)
     fout.close()
@@ -869,7 +914,7 @@ def dump_dtbo_image(fin, argv):
     if args.dtfilename:
         num_entries = len(dtbo.dt_entries)
         for idx in range(0, num_entries):
-            with open(args.dtfilename + f'.{idx:d}', 'wb') as fout:
+            with open(f'{args.dtfilename}.{idx:d}', 'wb') as fout:
                 dtbo.extract_dt_file(idx, fout, args.decompress)
     args.outfile.write(str(dtbo) + '\n')
     args.outfile.close()
@@ -885,7 +930,8 @@ def create_dtbo_image_from_config(fout, argv):
     if not args.conf_file:
         raise ValueError('Configuration file must be provided')
 
-    _DT_KEYS = ('id', 'rev', 'flags', 'custom0', 'custom1', 'custom2', 'custom3')
+    _DT_KEYS = (('id', 'rev', 'flags') +
+                tuple(f'custom{i}' for i in range(MAX_CUSTOM_FIELDS)))
     _GLOBAL_KEY_TYPES = {'dt_type': str, 'page_size': int, 'version': int}
 
     global_args, dt_args = parse_config_file(args.conf_file,
@@ -895,26 +941,29 @@ def create_dtbo_image_from_config(fout, argv):
     params = {}
     params['version'] = version
     dt_entries = []
-    for dt_arg in dt_args:
-        filepath = dt_arg['filename']
-        if not os.path.isabs(filepath):
-            for root, dirnames, filenames in os.walk(args.dtbdir):
-                for filename in fnmatch.filter(filenames, os.path.basename(filepath)):
-                    filepath = os.path.join(root, filename)
-        params['dt_file'] = open(filepath, 'rb')
-        params['dt_offset'] = 0
-        params['dt_size'] = os.fstat(params['dt_file'].fileno()).st_size
-        for key in _DT_KEYS:
-            if key not in dt_arg:
-                params[key] = global_args[key]
-            else:
-                params[key] = dt_arg[key]
-        dt_entries.append(DtEntry(**params))
+    with ExitStack() as stack:
+        for dt_arg in dt_args:
+            filepath = dt_arg['filename']
+            if not os.path.isabs(filepath):
+                for root, _, filenames in os.walk(args.dtbdir):
+                    for filename in fnmatch.filter(
+                            filenames, os.path.basename(filepath)):
+                        filepath = os.path.join(root, filename)
+            params['dt_file'] = stack.enter_context(open(filepath, 'rb'))
+            params['dt_offset'] = 0
+            params['dt_size'] = os.fstat(params['dt_file'].fileno()).st_size
+            for key in _DT_KEYS:
+                if key not in dt_arg:
+                    params[key] = global_args[key]
+                else:
+                    params[key] = dt_arg[key]
+            dt_entries.append(DtEntry(**params))
 
-    # Create and write DTBO file
-    dtbo = Dtbo(fout, global_args['dt_type'], global_args['page_size'], version)
-    dt_entry_buf = dtbo.add_dt_entries(dt_entries)
-    dtbo.commit(dt_entry_buf)
+        # Create and write DTBO file
+        dtbo = Dtbo(fout, global_args['dt_type'],
+                    global_args['page_size'], version)
+        dt_entry_buf = dtbo.add_dt_entries(dt_entries)
+        dtbo.commit(dt_entry_buf)
     fout.close()
 
 def print_default_usage(progname):
@@ -941,8 +990,10 @@ def print_dump_usage(progname):
     sb.append('    options:')
     sb.append('      -o, --output <filename>  Output file name.')
     sb.append('                               Default is output to stdout.')
-    sb.append('      -b, --dtb <filename>     Dump dtb/dtbo files from image.')
-    sb.append('                               Will output to <filename>.0, <filename>.1, etc.')
+    sb.append('      -b, --dtb <filename>     Dump dtb/dtbo files from '
+              'image.')
+    sb.append('                               Will output to <filename>.0, '
+              '<filename>.1, etc.')
     print('\n'.join(sb))
 
 def print_create_usage(progname):
@@ -952,22 +1003,26 @@ def print_create_usage(progname):
         progname: This program's name.
     """
     sb = []
-    sb.append('  ' + progname + ' create <image_file> (<global_option>...) (<dtb_file> (<entry_option>...) ...)\n')
+    sb.append('  ' + progname + ' create <image_file> (<global_option>...) '
+              '(<dtb_file> (<entry_option>...) ...)\n')
     sb.append('    global_options:')
-    sb.append('      --dt_type=<type>         Device Tree Type (dtb|acpi). Default: dtb')
+    sb.append('      --dt_type=<type>         Device Tree Type (dtb|acpi). '
+              'Default: dtb')
     sb.append('      --page_size=<number>     Page size. Default: 2048')
     sb.append('      --version=<number>       DTBO/ACPIO version. Default: 0')
-    sb.append('      --id=<number>       The default value to set property id in dt_table_entry. Default: 0')
+    sb.append('      --id=<number>       The default value to set property id '
+              'in dt_table_entry. Default: 0')
     sb.append('      --rev=<number>')
     sb.append('      --flags=<number>')
-    sb.append('      --custom0=<number>')
-    sb.append('      --custom1=<number>')
-    sb.append('      --custom2=<number>\n')
-    sb.append('      --custom3=<number>\n')
+    for i in range(MAX_CUSTOM_FIELDS):
+        sb.append(f'      --custom{i}=<number>')
+    sb.append('\n')
 
     sb.append('      The value could be a number or a DT node path.')
-    sb.append('      <number> could be a 32-bits digit or hex value, ex. 68000, 0x6800.')
-    sb.append('      <path> format is <full_node_path>:<property_name>, ex. /board/:id,')
+    sb.append('      <number> could be a 32-bits digit or hex value, ex. '
+              '68000, 0x6800.')
+    sb.append('      <path> format is <full_node_path>:<property_name>, '
+              'ex. /board/:id,')
     sb.append('      will read the value in given FTB file with the path.')
     print('\n'.join(sb))
 
@@ -978,10 +1033,12 @@ def print_cfg_create_usage(progname):
         progname: This program's name.
     """
     sb = []
-    sb.append('  ' + progname + ' cfg_create <image_file> <config_file> (<option>...)\n')
+    sb.append('  ' + progname + ' cfg_create <image_file> <config_file> '
+              '(<option>...)\n')
     sb.append('    options:')
     sb.append('      -d, --dtb-dir <dir>      The path to load dtb files.')
-    sb.append('                               Default is load from the current path.')
+    sb.append('                               Default is load from the '
+              'current path.')
     print('\n'.join(sb))
 
 def print_usage(cmd, _):
@@ -1005,12 +1062,12 @@ def print_usage(cmd, _):
         print_default_usage(prog_name)
 
     for help_cmd, help_func in help_commands:
-        if cmd == 'all' or cmd == help_cmd:
+        if cmd in ('all', help_cmd):
             help_func(prog_name)
             if cmd != 'all':
                 return
 
-    print('Unsupported help command: %s' % cmd, end='\n\n')
+    print(f'Unsupported help command: {cmd}', end='\n\n')
     print_default_usage(prog_name)
     return
 
