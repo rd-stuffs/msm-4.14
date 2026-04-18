@@ -2,6 +2,7 @@ name: Build Kernel
 
 on:
   push:
+  workflow_dispatch:
 
 jobs:
   build:
