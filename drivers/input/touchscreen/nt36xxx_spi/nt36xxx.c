@@ -2308,17 +2308,15 @@ int lct_nvt_tp_gesture_callback(bool flag)
 	}
 	if (flag) {
 		ts->is_gesture_mode = true;
-		if (nvt_ts_enable_regulator(true) < 0) {
+		if (nvt_ts_enable_regulator(true) < 0)
 			NVT_ERR("Failed to enable regulator\n");
-			set_lcd_reset_gpio_keep_high(true);
-		}
+		set_lcd_reset_gpio_keep_high(true);
 		NVT_LOG("enable gesture mode\n");
 	} else {
 		ts->is_gesture_mode = false;
-		if (nvt_ts_enable_regulator(false) < 0) {
+		if (nvt_ts_enable_regulator(false) < 0)
 			NVT_ERR("Failed to disable regulator\n");
-			set_lcd_reset_gpio_keep_high(false);
-		}
+		set_lcd_reset_gpio_keep_high(false);
 		NVT_LOG("disable gesture mode\n");
 	}
 	return 0;
