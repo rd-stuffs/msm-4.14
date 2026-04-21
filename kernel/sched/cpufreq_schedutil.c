@@ -282,7 +282,7 @@ static inline unsigned long sugov_apply_dvfs_headroom(unsigned long util,
 	unsigned long delta_t = capacity - threshold;
 
 	delta = capacity - capped_util;
-	headroom = (delta * delta * delta * 5) / (delta_t * capacity * 16);
+	headroom = (delta * delta * delta * 8) / (delta_t * capacity * 16);
 
 	if (capped_util < threshold) {
 		headroom = (headroom * capped_util * capped_util) /
