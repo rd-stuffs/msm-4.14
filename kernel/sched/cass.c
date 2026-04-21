@@ -120,7 +120,7 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 	if (cass_cmp(b->util, a->util))
 		goto done;
 
-	/* Prefer the CPU that is idle (only relevant for uclamped tasks) */
+	/* Prefer the CPU that is idle (only relevant for stune-boosted tasks) */
 	if (cass_cmp(!!a->exit_lat, !!b->exit_lat))
 		goto done;
 
@@ -156,16 +156,15 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	/* Initialize @best such that @best always has a valid CPU at the end */
 	struct cass_cpu_cand cands[2], *best = cands;
 	int this_cpu = raw_smp_processor_id();
-	unsigned long p_util, uc_min;
+	unsigned long p_util;
 	bool has_idle = false;
 	int cidx = 0, cpu;
 
 	/*
-	 * Get the utilization and uclamp minimum threshold for this task. Note
-	 * that RT tasks don't have per-entity load tracking.
+	 * Get the stune-boosted utilization for this task. Note that RT tasks
+	 * don't have per-entity load tracking so their utilization is zero.
 	 */
-	p_util = rt ? 0 : task_util_est(p);
-	uc_min = uclamp_eff_value(p, UCLAMP_MIN);
+	p_util = rt ? 0 : boosted_task_util(p);
 
 	/*
 	 * Find the best CPU to wake @p on. Although idle_get_state() requires
@@ -190,10 +189,6 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		/* Get the original, maximum _possible_ capacity of this CPU */
 		curr->cap_max = arch_scale_cpu_capacity(NULL, cpu);
 
-		/* Prefer the CPU that more closely meets the uclamp minimum */
-		if (curr->cap_max < uc_min && curr->cap_max < best->cap_max)
-			continue;
-
 		/*
 		 * Check if this CPU is idle or only has SCHED_IDLE tasks. For
 		 * sync wakes, treat the current CPU as idle if @current is the
@@ -204,14 +199,10 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		    idle_cpu(cpu) || sched_idle_cpu(cpu)) {
 			/*
 			 * A non-idle candidate may be better for energy
-			 * efficiency when @p is uclamp boosted above @curr's
-			 * minimum capacity, or when the only idle candidate
-			 * found so far is the prime CPU. Otherwise, prefer idle
-			 * candidates.
+			 * efficiency when the only idle candidate found so far
+			 * is the prime CPU. Otherwise, prefer idle candidates.
 			 */
-			if (!has_idle &&
-			    uc_min <= arch_scale_min_freq_capacity(cpu) &&
-			    !cass_prime_cpu(curr)) {
+			if (!has_idle && !cass_prime_cpu(curr)) {
 				/* Discard any previous non-idle candidate */
 				best = curr;
 				has_idle = true;
@@ -247,28 +238,15 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		/*
 		 * Calculate the effective utilization for this CPU candidate;
 		 * i.e., the utilization calculated by the CPU governor. This is
-		 * needed to evaluate whether or not a throttled CPU is
-		 * overloaded, since the relative utilization calculation
-		 * disregards thermal pressure.
+		 * needed to evaluate whether or not a CPU is overloaded.
 		 */
-		curr->eff_util = max(curr->util + curr->hard_util, uc_min);
-
-		/* Clamp the utilization to the minimum performance threshold */
-		if (curr->util < uc_min)
-			curr->util = uc_min;
+		curr->eff_util = curr->util + curr->hard_util;
 
 		/*
-		 * Calculate the relative utilization for this CPU candidate
-		 * without thermal pressure included. Thermal pressure needs to
-		 * be disregarded in order to fairly distribute load such that
-		 * higher P-states aren't pushed on CPUs that are throttled to a
-		 * lesser degree. For example, if CPU A were throttled to 50% of
-		 * its maximum possible capacity, and CASS targeted 20% relative
-		 * load on all CPUs, CPU A would receive (20% * 50%) = 10% load
-		 * relative to its maximum possible P-state. This burden would
-		 * then be redistributed to other CPUs, causing a load imbalance
-		 * that would reduce CASS's energy efficiency due to
-		 * disproportionate P-states.
+		 * Calculate the relative utilization for this CPU candidate.
+		 * cap is used as the capacity baseline (cap_max minus hard_util)
+		 * so that load is fairly distributed across CPUs of differing
+		 * capacities.
 		 */
 		curr->util =
 			curr->util * SCHED_CAPACITY_SCALE / curr->cap;
