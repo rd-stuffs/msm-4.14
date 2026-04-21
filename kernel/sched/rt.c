@@ -1670,8 +1670,7 @@ static struct task_struct *_pick_next_task_rt(struct rq *rq)
 	return p;
 }
 
-extern int update_rt_rq_load_avg(u64 now, int cpu, struct rt_rq *rt_rq, int running);
-
+extern int update_rt_rq_load_avg(u64 now, struct rq *rq, int running);
 static struct task_struct *
 pick_next_task_rt(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
@@ -1717,9 +1716,13 @@ pick_next_task_rt(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 
 	queue_push_tasks(rq);
 
-	if (p)
-		update_rt_rq_load_avg(rq_clock_task(rq), cpu_of(rq), rt_rq,
-					rq->curr->sched_class == &rt_sched_class);
+	/*
+	 * If prev task was rt, put_prev_task() has already updated the
+	 * utilization. We only care of the case where we start to schedule a
+	 * rt task
+	 */
+	if (rq->curr->sched_class != &rt_sched_class)
+		update_rt_rq_load_avg(rq_clock_task(rq), rq, 0);
 
 	return p;
 }
@@ -1728,7 +1731,7 @@ static void put_prev_task_rt(struct rq *rq, struct task_struct *p)
 {
 	update_curr_rt(rq);
 
-	update_rt_rq_load_avg(rq_clock_task(rq), cpu_of(rq), &rq->rt, 1);
+	update_rt_rq_load_avg(rq_clock_task(rq), rq, 1);
 
 	/*
 	 * The previous task needs to be made eligible for pushing
@@ -2446,6 +2449,15 @@ static void rq_offline_rt(struct rq *rq)
 static void switched_from_rt(struct rq *rq, struct task_struct *p)
 {
 	/*
+	 * If we are running, update the avg_rt tracking, as the running time
+	 * will now on be accounted into the latter.
+	 */
+	if (task_current(rq, p)) {
+		update_rt_rq_load_avg(rq_clock_task(rq), rq, 0);
+		return;
+	}
+
+	/*
 	 * If there are other RT tasks then we will reschedule
 	 * and the scheduling of the other RT tasks will handle
 	 * the balancing. But if we are the last RT task
@@ -2566,7 +2578,7 @@ static void task_tick_rt(struct rq *rq, struct task_struct *p, int queued)
 	struct sched_rt_entity *rt_se = &p->rt;
 
 	update_curr_rt(rq);
-	update_rt_rq_load_avg(rq_clock_task(rq), cpu_of(rq), &rq->rt, 1);
+	update_rt_rq_load_avg(rq_clock_task(rq), rq, 1);
 
 	watchdog(rq, p);
 
