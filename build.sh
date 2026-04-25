@@ -15,7 +15,7 @@ GCC64_DIR="$WD/tc/gcc-arm64"
 GCC32_DIR="$WD/tc/gcc-arm"
 GCC_RELEASES_API="https://api.github.com/repos/mvaisakh/gcc-build/releases/latest"
 GCC_DOWNLOAD_URL="https://github.com/mvaisakh/gcc-build/releases/download"
-GCC_TAG="$(curl -fsSL "$GCC_RELEASES_API" | grep -m1 '"tag_name"' | cut -d'"' -f4)"
+GCC_TAG="$(curl -fsSL "$GCC_RELEASES_API" 2>/dev/null | grep -m1 '"tag_name"' | cut -d'"' -f4 || true)"
 
 AK3_DIR="$WD/AnyKernel3"
 AK3_URL="https://github.com/rd-stuffs/AnyKernel3"
@@ -26,18 +26,24 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
 fi
 
 if [ -d "$GCC64_DIR" ] && [ -d "$GCC32_DIR" ]; then
-	GCC_INSTALLED_DATE="$("$GCC64_DIR/bin/aarch64-elf-gcc" --version | grep -o '[0-9]\{8\}')"
-	GCC_INSTALLED_DATE="${GCC_INSTALLED_DATE:6:2}${GCC_INSTALLED_DATE:4:2}${GCC_INSTALLED_DATE:0:4}"
-	if [[ $GCC_INSTALLED_DATE != "$GCC_TAG" ]]; then
-		printf "Eva GCC update available (%s). Update? [y/N] " "$GCC_TAG"
-		read -r GCC_UPDATE
-		if [[ ${GCC_UPDATE,,} == y ]]; then
-			rm -rf "$GCC64_DIR" "$GCC32_DIR"
+	if [ -n "$GCC_TAG" ]; then
+		GCC_INSTALLED_DATE="$("$GCC64_DIR/bin/aarch64-elf-gcc" --version | grep -o '[0-9]\{8\}')"
+		GCC_INSTALLED_DATE="${GCC_INSTALLED_DATE:6:2}${GCC_INSTALLED_DATE:4:2}${GCC_INSTALLED_DATE:0:4}"
+		if [[ $GCC_INSTALLED_DATE != $GCC_TAG ]]; then
+			printf "Eva GCC update available (%s). Update? [y/N] " $GCC_TAG
+			read -r GCC_UPDATE
+			if [[ ${GCC_UPDATE,,} == y ]]; then
+				rm -rf "$GCC64_DIR" "$GCC32_DIR"
+			fi
 		fi
 	fi
 fi
 
 if [ ! -d "$GCC64_DIR" ] || [ ! -d "$GCC32_DIR" ]; then
+	if [ -z "$GCC_TAG" ]; then
+		printf "No internet connection and toolchain is missing, aborting.\n"
+		exit 1
+	fi
 	if [ ! -d "$GCC64_DIR" ]; then
 		printf "Downloading Eva GCC arm64 (%s)...\n" "$GCC_TAG"
 		mkdir -p "$GCC64_DIR"
