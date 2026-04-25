@@ -4,10 +4,14 @@
 
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/sched/signal.h>
 
 static inline bool task_is_blocklisted(struct task_struct *tsk)
 {
 	char comm[TASK_COMM_LEN];
+
+	if (tsk->signal->oom_score_adj >= 0)
+		return false;
 
 	get_task_comm(comm, tsk);
 	return is_global_init(tsk) ||
