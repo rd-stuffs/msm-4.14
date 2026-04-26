@@ -202,7 +202,9 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 			 * efficiency when the only idle candidate found so far
 			 * is the prime CPU. Otherwise, prefer idle candidates.
 			 */
-			if (!has_idle && !cass_prime_cpu(curr)) {
+			if (!has_idle &&
+			    p_util <= arch_scale_min_freq_capacity(cpu) &&
+			    !cass_prime_cpu(curr)) {
 				/* Discard any previous non-idle candidate */
 				best = curr;
 				has_idle = true;
