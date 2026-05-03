@@ -35,6 +35,10 @@
 
 #include "zram_drv.h"
 
+#ifndef SZ_4G
+#define SZ_4G (((size_t) SZ_1G) * 4)
+#endif
+
 static DEFINE_IDR(zram_index_idr);
 /* idr index must be protected */
 static DEFINE_MUTEX(zram_index_mutex);
@@ -2425,9 +2429,8 @@ static ssize_t disksize_store(struct device *dev,
 	int err;
 	u32 prio;
 
-	disksize = memparse(buf, NULL);
-	if (!disksize)
-		return -EINVAL;
+	disksize = PAGE_ALIGN((u64)SZ_4G);
+	pr_info("Setting zRAM size to %llu GB", disksize / 1073741824);
 
 	down_write(&zram->init_lock);
 	if (init_done(zram)) {
