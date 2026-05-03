@@ -323,11 +323,8 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 			delta = 0;
 		rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
 		rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
-		*util = min(*util + rt, max_cap);
+		*util = min(apply_dvfs_headroom(*util, cpu) + rt, max_cap);
 	}
-
-	/* Apply dvfs headroom to util */
-	*util = apply_dvfs_headroom(*util, cpu);
 }
 
 static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time)
