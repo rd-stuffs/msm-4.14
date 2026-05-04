@@ -38,8 +38,8 @@ jobs:
         run: |
           DATE=$(date '+%H:%M %d/%m/%Y')
           COMMIT="https://github.com/${{ github.repository }}/commit/$(git rev-parse HEAD)"
-          STANDARD=$(ls FSociety-surya-*.zip)
-          KSU=$(ls FSociety-KSU-*.zip)
+          STANDARD=$(ls Void-Project-surya-*.zip)
+          KSU=$(ls Void-Project-KSU-*.zip)
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
             -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -F document=@"${STANDARD}" \
