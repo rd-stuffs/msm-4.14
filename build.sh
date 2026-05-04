@@ -8,7 +8,7 @@ set -euo pipefail
 trap 'printf "\nInterrupted.\n"; exit 1' INT
 
 WD="$(pwd)"
-ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
+ZIPNAME="Void-Project-surya-$(date '+%Y%m%d-%H%M').zip"
 DEFCONFIG="surya_defconfig"
 
 GCC64_DIR="$WD/tc/gcc-arm64"
@@ -113,7 +113,7 @@ printf "Building surya defconfig...\n"
 
 if [[ $KSU == "true" ]]; then
 	printf "Building KernelSU variant...\n"
-	ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+	ZIPNAME="${ZIPNAME/Void-Project-surya/Void-Project-KSU}"
 	scripts/config --file out/.config -e KSU
 	"${MAKE[@]}" olddefconfig &>/dev/null
 fi
