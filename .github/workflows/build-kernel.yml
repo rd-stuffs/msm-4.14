@@ -21,7 +21,7 @@ jobs:
       - name: Apply Specific Commit
         run: |
           # Mengambil commit dari repository rd-stuffs
-          curl -Ls https://github.com/rd-stuffs/msm-4.14/commit/5682d60e54d750bab31cd29817def836763e42f7.patch
+          curl -Ls #https
           
       - name: Build
         run: |
