@@ -21,7 +21,7 @@ jobs:
       - name: Apply Specific Commit
         run: |
           # Mengambil commit dari repository rd-stuffs
-          curl -Ls https://github.com/rinnsakaguchi/android_kernel_common-5.10/commit/fd14e9907b49ccc7a7a94c17d0489c8d47f4c8c0
+          curl -Ls https://github.com/KaiFujiro/kernel_xiaomi_sm8250/commit/3696a9caabcc52ca32e088053d8fee55c27c0f4a
           
       - name: Build
         run: |
