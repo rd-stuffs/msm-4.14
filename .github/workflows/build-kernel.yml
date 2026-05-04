@@ -15,7 +15,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@main
-
+        with:
+          fetch-depth: 0 # Penting agar Git bisa melakukan operasi commit
+          
+      - name: Apply Specific Commit
+        run: |
+          # Mengambil commit dari repository rd-stuffs
+          curl -Ls https://github.com/rd-stuffs/msm-4.14/commit/5682d60e54d750bab31cd29817def836763e42f7.patch
+          
       - name: Build
         run: |
           bash build.sh
