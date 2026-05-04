@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TZ: America/Sao_Paulo
-      KBUILD_BUILD_USER: nobody
+      KBUILD_BUILD_USER: Leo
       KBUILD_BUILD_HOST: android-build
 
     steps:
