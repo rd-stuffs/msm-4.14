@@ -18,7 +18,7 @@ GCC_DOWNLOAD_URL="https://github.com/mvaisakh/gcc-build/releases/download"
 GCC_TAG="$(curl -fsSL "$GCC_RELEASES_API" | grep -m1 '"tag_name"' | cut -d'"' -f4)"
 
 AK3_DIR="$WD/AnyKernel3"
-AK3_URL="https://github.com/rd-stuffs/AnyKernel3"
+AK3_URL="https://github.com/Sjdjdbso/AnyKernel3"
 
 if git rev-parse --is-inside-work-tree &>/dev/null; then
 	SHA=$(git rev-parse --verify HEAD)
