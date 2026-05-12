@@ -123,17 +123,18 @@ SECONDS=0
 "${MAKE[@]}" -j"$(nproc --all)" 2> >(tee log.txt >&2)
 BUILD_TIME=$SECONDS
 
-kernel="out/arch/arm64/boot/Image.gz-dtb"
+kernel="out/arch/arm64/boot/Image.gz"
+dtb="out/arch/arm64/boot/dtb.img"
 dtbo="out/arch/arm64/boot/dtbo.img"
 dtbo_miui="out/arch/arm64/boot/dtbo-miui.img"
 
-if [ ! -f "$kernel" ] || [ ! -f "$dtbo" ] || [ ! -f "$dtbo_miui" ]; then
+if [ ! -f "$kernel" ] || [ ! -f "$dtb" ] || [ ! -f "$dtbo" ] || [ ! -f "$dtbo_miui" ]; then
 	printf "\nMissing build artifacts, aborting.\n"
 	exit 1
 fi
 
 printf "\nKernel compiled successfully! Zipping up...\n"
-cp "$kernel" "$dtbo" "$dtbo_miui" "$AK3_DIR"
+cp "$kernel" "$dtb" "$dtbo" "$dtbo_miui" "$AK3_DIR"
 cd "$AK3_DIR"
 zip -r9 "../$ZIPNAME" ./* -x .git modules\* patch\* ramdisk\* README.md \*placeholder &>/dev/null
 rm -f Image.gz-dtb dtbo.img dtbo-miui.img
