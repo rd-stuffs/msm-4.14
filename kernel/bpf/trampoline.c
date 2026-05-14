@@ -7,7 +7,6 @@
 #include <linux/rbtree_latch.h>
 #include <linux/perf_event.h>
 #include <linux/btf.h>
-#include <linux/rcupdate_trace.h>
 #include <linux/rcupdate_wait.h>
 
 /* dummy _ops. The verifier will operate on target program's ops. */
@@ -217,7 +216,7 @@ static int bpf_trampoline_update(struct bpf_trampoline *tr)
 	 * programs finish executing.
 	 * Wait for these two grace periods together.
 	 */
-	synchronize_rcu_mult(call_rcu_tasks, call_rcu_tasks_trace);
+	synchronize_rcu();
 
 	err = arch_prepare_bpf_trampoline(new_image, new_image + PAGE_SIZE / 2,
 					  &tr->func.model, flags, tprogs,
@@ -428,13 +427,13 @@ void notrace __bpf_prog_exit(struct bpf_prog *prog, u64 start)
 
 void notrace __bpf_prog_enter_sleepable(void)
 {
-	rcu_read_lock_trace();
+	rcu_read_lock();
 	might_fault();
 }
 
 void notrace __bpf_prog_exit_sleepable(void)
 {
-	rcu_read_unlock_trace();
+	rcu_read_unlock();
 }
 
 int __weak
