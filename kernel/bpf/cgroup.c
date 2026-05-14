@@ -1820,7 +1820,7 @@ BPF_CALL_1(bpf_get_netns_cookie_sockopt, struct bpf_sockopt_kern *, ctx)
 {
 	const struct net *net = ctx ? sock_net(ctx->sk) : &init_net;
 
-	return net->net_cookie;
+	return atomic64_read(&net->net_cookie);
 }
 
 static const struct bpf_func_proto bpf_get_netns_cookie_sockopt_proto = {
