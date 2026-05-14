@@ -30,6 +30,10 @@ from sys import stdout
 
 MAX_CUSTOM_FIELDS = 11
 
+def _align_up(value, alignment):
+    """Round `value` up to the next multiple of `alignment`."""
+    return (value + alignment - 1) & ~(alignment - 1)
+
 class CompressionFormat(object):
     """Enum representing DT compression format for a DT entry.
     """
@@ -219,6 +223,7 @@ class Dtbo(object):
         _BYTES_PER_INT: Number of bytes per 32-bit integer.
         _GZIP_COMPRESSION_WBITS: Argument 'wbits' for gzip compression
         _ZLIB_DECOMPRESSION_WBITS: Argument 'wbits' for zlib/gzip compression
+        _DT_ENTRY_ALIGNMENT: Byte alignment of each DT blob.
     """
 
     _DTBO_MAGIC = 0xd7b7ab1e
@@ -229,6 +234,7 @@ class Dtbo(object):
     _BYTES_PER_INT = 4
     _GZIP_COMPRESSION_WBITS = 31
     _ZLIB_DECOMPRESSION_WBITS = 47
+    _DT_ENTRY_ALIGNMENT = 8
 
     @classmethod
     def _get_dt_entry_size(cls, version):
@@ -390,7 +396,9 @@ class Dtbo(object):
 
     def _write_padding_bytes(self):
         """Append padding bytes to align DTB/DTBO img to the next page size"""
-        padding_size = (self.page_size - (self.total_size % self.page_size)) % self.page_size
+        padding_size = (
+            self.page_size - (self.total_size % self.page_size)
+        ) % self.page_size
         if padding_size:
             padding_data = b'\x00' * padding_size
             self.__file.write(padding_data)
@@ -550,6 +558,11 @@ class Dtbo(object):
                 dt_entry.dt_offset = entry.dt_offset
                 dt_entry.size = entry.size
             else:
+                # Align the start of the blob to ensure 8-byte alignment within the image.
+                pad = _align_up(dt_offset, self._DT_ENTRY_ALIGNMENT) - dt_offset
+                dt_entry_buf += b'\x00' * pad
+                dt_offset += pad
+                self.total_size += pad
                 dt_entry.dt_offset = dt_offset
                 compressed_entry, dt_entry.size = self.compress_dt_entry(
                     dt_entry_compression_info, dt_entry.dt_file)
