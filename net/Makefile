@@ -22,7 +22,9 @@ obj-$(CONFIG_XFRM)		+= xfrm/
 obj-$(CONFIG_UNIX_SCM)		+= unix/
 obj-$(CONFIG_NET)		+= ipv6/
 ifneq ($(CC_CAN_LINK),y)
+ifeq ($(CONFIG_BPFILTER),y)
 $(warning CC cannot link executables. Skipping bpfilter.)
+endif
 else
 obj-$(CONFIG_BPFILTER)		+= bpfilter/
 endif
