@@ -56,10 +56,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/timer.h>
 
-__visible u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
-
-EXPORT_SYMBOL(jiffies_64);
-
 /*
  * The timer wheel has LVL_DEPTH array levels. Each level provides an array of
  * LVL_SIZE buckets. Each level is driven by its own clock and therefor each
