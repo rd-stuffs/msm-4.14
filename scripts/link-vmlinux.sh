@@ -161,7 +161,7 @@ vmlinux_link()
 				${@:2}"
 		fi
 
-		${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${1}	\
+		${ld} ${ldflags} -o ${1}	\
 			-T ${lds} ${objects}
 	else
 		objects="-Wl,--whole-archive			\
