@@ -197,7 +197,7 @@ static ssize_t msm_rpmstats_populate_stats(void)
 					gpdata->phys_size);
 	if (!prvdata.reg_base) {
 		pr_err("ERROR could not ioremap start=%pa, len=%u\n",
-				gpdata->phys_addr_base, gpdata->phys_size);
+				&gpdata->phys_addr_base, gpdata->phys_size);
 		return -EBUSY;
 	}
 	prvdata.read_idx = prvdata.len = 0;
