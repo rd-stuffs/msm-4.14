@@ -29,8 +29,8 @@ if [ -d "$GCC64_DIR" ] && [ -d "$GCC32_DIR" ]; then
 	if [ -n "$GCC_TAG" ]; then
 		GCC_INSTALLED_DATE="$("$GCC64_DIR/bin/aarch64-elf-gcc" --version | grep -o '[0-9]\{8\}')"
 		GCC_INSTALLED_DATE="${GCC_INSTALLED_DATE:6:2}${GCC_INSTALLED_DATE:4:2}${GCC_INSTALLED_DATE:0:4}"
-		if [[ $GCC_INSTALLED_DATE != $GCC_TAG ]]; then
-			printf "Eva GCC update available (%s). Update? [y/N] " $GCC_TAG
+		if [[ $GCC_INSTALLED_DATE != "$GCC_TAG" ]]; then
+			printf "Eva GCC update available (%s). Update? [y/N] " "$GCC_TAG"
 			read -r GCC_UPDATE
 			if [[ ${GCC_UPDATE,,} == y ]]; then
 				rm -rf "$GCC64_DIR" "$GCC32_DIR"
@@ -96,16 +96,16 @@ KSU="false"
 
 for arg in "$@"; do
 	case $arg in
-		-c | --clean)
-			CLEAN="true"
-			;;
-		-s | --su)
-			KSU="true"
-			;;
-		*)
-			printf "Unknown argument: %s\n" "$arg"
-			exit 1
-			;;
+	-c | --clean)
+		CLEAN="true"
+		;;
+	-s | --su)
+		KSU="true"
+		;;
+	*)
+		printf "Unknown argument: %s\n" "$arg"
+		exit 1
+		;;
 	esac
 done
 
