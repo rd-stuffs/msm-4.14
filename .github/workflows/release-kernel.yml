@@ -1,7 +1,6 @@
-name: Build Kernel
+name: Release Prebuilt
 
 on:
-  push:
   workflow_dispatch:
 
 jobs:
@@ -37,29 +36,7 @@ jobs:
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
       - name: Build
-        run: |
-          bash build.sh
-          bash build.sh --su
+        run: bash build.sh
 
       - name: Export prebuilts
-        run: bash prebuilt.sh
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@main
-        with:
-          name: kernel-zips
-          path: "*.zip"
-
-      - name: Send to Telegram
-        run: |
-          DATE=$(date '+%H:%M %d/%m/%Y')
-          COMMIT="https://github.com/${{ github.repository }}/commit/$(git rev-parse HEAD)"
-          STANDARD=$(ls FSociety-surya-*.zip)
-          KSU=$(ls FSociety-KSU-*.zip)
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F document=@"${STANDARD}" \
-            -F caption="${DATE}"$'\n\n'"${COMMIT}"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F document=@"${KSU}"
+        run: bash prebuilt.sh --release

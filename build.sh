@@ -121,6 +121,7 @@ fi
 printf "\n"
 SECONDS=0
 "${MAKE[@]}" -j"$(nproc --all)" 2> >(tee log.txt >&2)
+"${MAKE[@]}" headers_install &>/dev/null
 BUILD_TIME=$SECONDS
 
 kernel="out/arch/arm64/boot/Image.gz"
