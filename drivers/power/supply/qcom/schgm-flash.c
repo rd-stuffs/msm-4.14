@@ -66,7 +66,7 @@ irqreturn_t schgm_flash_state_change_irq_handler(int irq, void *data)
 		pr_err("Couldn't read flash status_3 rc=%d\n", rc);
 	else
 		pr_debug("Flash status changed state=[%x]\n",
-					(reg && FLASH_STATE_MASK));
+					(unsigned int)(reg & FLASH_STATE_MASK));
 
 	return IRQ_HANDLED;
 }
