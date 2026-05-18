@@ -1188,7 +1188,7 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 	struct new_utsname tmp;
 	const char *release_str;
 
-	release_str = is_legacy_ebpf ? "4.19.0" : "5.10.239";
+	release_str = is_legacy_ebpf ? "5.4.299" : "5.10.239";
 
 	down_read(&uts_sem);
 	memcpy(&tmp, utsname(), sizeof(tmp));
