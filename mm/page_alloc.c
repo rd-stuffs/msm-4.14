@@ -4430,9 +4430,9 @@ retry:
 		goto nopage;
 
 	/* Boost when memory is low so allocation latency doesn't get too bad */
-	cpu_input_boost_kick_max(100);
-	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 100);
-	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+	cpu_input_boost_kick_max(150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
 
 	/*
 	 * Do not retry costly high order allocations unless they are

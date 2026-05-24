@@ -96,6 +96,7 @@
 #include <linux/scs.h>
 #include <linux/simple_lmk.h>
 #include <linux/devfreq_boost.h>
+#include <linux/cpu_input_boost.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -2252,10 +2253,11 @@ long _do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long nr;
 
-	/* Boost DDR bus to the max for 50 ms when userspace launches an app */
+	/* Boost to the max for 150 ms when userspace launches an app */
 	if (task_is_zygote(current)) {
-		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 50);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
+		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
+		cpu_input_boost_kick_max(150);
 	}
 
 	/*
