@@ -1182,13 +1182,9 @@ static int override_release(char __user *release, size_t len)
 	return ret;
 }
 
-extern bool is_legacy_ebpf;
 SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 {
 	struct new_utsname tmp;
-	const char *release_str;
-
-	release_str = is_legacy_ebpf ? "4.19.0" : "5.10.239";
 
 	down_read(&uts_sem);
 	memcpy(&tmp, utsname(), sizeof(tmp));
@@ -1196,7 +1192,7 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 		!strncmp(current->comm, "netbpfload", 10) ||
 		!strncmp(current->comm, "netd", 4)) {
 		if (current_uid().val == 0) {
-			strcpy(tmp.release, release_str);
+			strcpy(tmp.release, "5.10.239");
 			pr_debug("fake uname: %s/%d release=%s\n",
 				current->comm, current->pid, tmp.release);
 		}
