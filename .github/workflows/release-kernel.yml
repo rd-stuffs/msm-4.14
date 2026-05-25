@@ -36,7 +36,7 @@ jobs:
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
       - name: Build
-        run: bash build.sh
+        run: bash build.sh --lto
 
       - name: Export prebuilts
         run: bash prebuilt.sh --release
