@@ -92,12 +92,16 @@ if [[ ${1:-} == -rf || ${1:-} == --regen-full ]]; then
 fi
 
 CLEAN="false"
+LTO="false"
 KSU="false"
 
 for arg in "$@"; do
 	case $arg in
 	-c | --clean)
 		CLEAN="true"
+		;;
+	-l | --lto)
+		LTO="true"
 		;;
 	-s | --su)
 		KSU="true"
@@ -116,6 +120,11 @@ fi
 
 printf "Building surya defconfig...\n"
 "${MAKE[@]}" $DEFCONFIG &>/dev/null
+
+if [[ $LTO == "true" ]]; then
+	scripts/config --file out/.config -e LTO_GCC
+	"${MAKE[@]}" olddefconfig &>/dev/null
+fi
 
 if [[ $KSU == "true" ]]; then
 	printf "Building KernelSU variant...\n"
