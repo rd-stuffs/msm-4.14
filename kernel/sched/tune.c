@@ -766,16 +766,16 @@ static void write_default_values(struct cgroup_subsys_state *css)
 {
 	char name_buf[NAME_MAX + 1];
 	static struct st_data st_targets[] = {
-		{ "audio-app",		0, 0 },
-		{ "background",		0, 0 },
-		{ "camera-daemon",	0, 0 },
-		{ "foreground",		0, 1 },
-		{ "foreground_window",	0, 1 },
-		{ "nnapi-hal",		0, 0 },
-		{ "restricted",		0, 0 },
-		{ "rt",			0, 0 },
-		{ "system-background",	0, 0 },
-		{ "top-app",		0, 1 },
+		{"audio-app",		0, 0},
+		{"background",		0, 0},
+		{"camera-daemon",	0, 1},
+		{"foreground",		0, 1},
+		{"foreground_window",	0, 1},
+		{"nnapi-hal",		0, 1},
+		{"restricted",		0, 0},
+		{"rt",			0, 0},
+		{"system-background",	0, 0},
+		{"top-app",		0, 1},
 	};
 	int i;
 
