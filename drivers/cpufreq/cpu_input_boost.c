@@ -216,11 +216,11 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 	 * unboosting, set policy->min to the absolute min freq for the CPU.
 	 */
 	if (test_bit(INPUT_BOOST, &b->state))
-		policy->min = get_input_boost_freq(policy);
+		policy->min = max(policy->min, get_input_boost_freq(policy));
 	else if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
-		policy->min = min_freq_lp;
+		policy->min = max(policy->min, min_freq_lp);
 	else
-		policy->min = min_freq_hp;
+		policy->min = max(policy->min, min_freq_hp);
 
 	return NOTIFY_OK;
 }
