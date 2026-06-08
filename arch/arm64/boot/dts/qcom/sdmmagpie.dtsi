@@ -490,6 +490,26 @@
 		#size-cells = <2>;
 		ranges;
 
+		tzlog_region: tzlog@146aa720 {
+			reg = <0x0 0x146aa720 0x0 0x3000>;
+			no-map;
+		};
+
+		rpm_stats_region: rpm-stats@c300000 {
+			reg = <0x0 0x0c300000 0x0 0x1000>;
+			no-map;
+		};
+
+		rpm_stats_reg_region: rpm-stats-reg@c3f0004 {
+			reg = <0x0 0x0c3f0004 0x0 0x4>;
+			no-map;
+		};
+
+		rpmh_master_stats_region: rpmh-master-stats@b221200 {
+			reg = <0x0 0x0b221200 0x0 0x60>;
+			no-map;
+		};
+
 		hyp_region: hyp_region@85700000 {
 			compatible = "removed-dma-pool";
 			no-map;
