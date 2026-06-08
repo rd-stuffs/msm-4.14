@@ -89,6 +89,13 @@ MAKE=(
 	LLVM_IAS=0
 )
 
+if [[ ${1:-} == -r || ${1:-} == --regen ]]; then
+	"${MAKE[@]}" $DEFCONFIG savedefconfig
+	cp out/defconfig arch/arm64/configs/$DEFCONFIG
+	printf "\nSuccessfully regenerated defconfig at %s\n" $DEFCONFIG
+	exit
+fi
+
 if [[ ${1:-} == -rf || ${1:-} == --regen-full ]]; then
 	"${MAKE[@]}" $DEFCONFIG
 	cp out/.config arch/arm64/configs/$DEFCONFIG
