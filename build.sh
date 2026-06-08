@@ -27,9 +27,12 @@ fi
 
 if [ -d "$GCC64_DIR" ] && [ -d "$GCC32_DIR" ]; then
 	if [ -n "$GCC_TAG" ]; then
-		GCC_INSTALLED_DATE="$("$GCC64_DIR/bin/aarch64-elf-gcc" --version | grep -o '[0-9]\{8\}')"
-		GCC_INSTALLED_DATE="${GCC_INSTALLED_DATE:6:2}${GCC_INSTALLED_DATE:4:2}${GCC_INSTALLED_DATE:0:4}"
-		if [[ $GCC_INSTALLED_DATE != "$GCC_TAG" ]]; then
+		GCC_INSTALLED_TAG=""
+		if [ -f "$GCC64_DIR/.eva_tag" ]; then
+			GCC_INSTALLED_TAG=$(cat "$GCC64_DIR/.eva_tag")
+		fi
+
+		if [[ "$GCC_INSTALLED_TAG" != "$GCC_TAG" ]]; then
 			printf "Eva GCC update available (%s). Update? [y/N] " "$GCC_TAG"
 			read -r GCC_UPDATE
 			if [[ ${GCC_UPDATE,,} == y ]]; then
@@ -49,6 +52,7 @@ if [ ! -d "$GCC64_DIR" ] || [ ! -d "$GCC32_DIR" ]; then
 		mkdir -p "$GCC64_DIR"
 		curl -fL# "$GCC_DOWNLOAD_URL/$GCC_TAG/eva-gcc-arm64-$GCC_TAG.xz" |
 			tar xf - --strip-components=1 -C "$GCC64_DIR"
+		echo "$GCC_TAG" > "$GCC64_DIR/.eva_tag"
 	fi
 
 	if [ ! -d "$GCC32_DIR" ]; then
@@ -56,6 +60,7 @@ if [ ! -d "$GCC64_DIR" ] || [ ! -d "$GCC32_DIR" ]; then
 		mkdir -p "$GCC32_DIR"
 		curl -fL# "$GCC_DOWNLOAD_URL/$GCC_TAG/eva-gcc-arm-$GCC_TAG.xz" |
 			tar xf - --strip-components=1 -C "$GCC32_DIR"
+		echo "$GCC_TAG" > "$GCC32_DIR/.eva_tag"
 	fi
 fi
 
