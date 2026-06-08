@@ -82,7 +82,7 @@ static char *backend;
 #define WINDOW_BITS 12
 #define MEM_LEVEL 4
 static struct z_stream_s stream;
-#else
+#elif defined(CONFIG_PSTORE_LZO_COMPRESS) || defined(CONFIG_PSTORE_LZ4_COMPRESS)
 static unsigned char *workspace;
 #endif
 
@@ -433,7 +433,7 @@ static void allocate_buf_for_compression(void)
 		pr_info("using %s compression\n", zbackend->name);
 		zbackend->allocate();
 	} else {
-		pr_err("allocate compression buffer error!\n");
+		pr_info("pstore compression disabled\n");
 	}
 }
 
@@ -441,8 +441,6 @@ static void free_buf_for_compression(void)
 {
 	if (zbackend)
 		zbackend->free();
-	else
-		pr_err("free compression buffer error!\n");
 }
 
 /*
