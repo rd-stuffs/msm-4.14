@@ -259,7 +259,7 @@ int reg_dmav1_init_dspp_op_v4(int feature, enum sde_dspp idx)
 	}
 
 	if (feature_map[feature] >= REG_DMA_FEATURES_MAX) {
-		DRM_ERROR("invalid feature map %d for feature %d\n",
+		DRM_DEBUG("unsupported reg-dma feature map %d for feature %d\n",
 			feature_map[feature], feature);
 		return -ENOTSUPP;
 	}
@@ -1667,7 +1667,7 @@ int reg_dmav1_init_sspp_op_v4(int feature, enum sde_sspp idx)
 	}
 
 	if (sspp_feature_map[feature] >= REG_DMA_FEATURES_MAX) {
-		DRM_ERROR("invalid feature map %d for feature %d\n",
+		DRM_DEBUG("unsupported reg-dma feature map %d for feature %d\n",
 			sspp_feature_map[feature], feature);
 		return -ENOTSUPP;
 	}
