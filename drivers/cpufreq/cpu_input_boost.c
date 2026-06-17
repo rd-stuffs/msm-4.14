@@ -10,23 +10,8 @@
 #include <linux/msm_drm_notify.h>
 #include <linux/input.h>
 #include <linux/kthread.h>
-#include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/version.h>
-
-static unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
-static unsigned int wake_boost_duration = CONFIG_WAKE_BOOST_DURATION_MS;
-static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
-static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
-static unsigned int min_freq_lp = CONFIG_MIN_FREQ_LP;
-static unsigned int min_freq_hp = CONFIG_MIN_FREQ_PERF;
-
-module_param(input_boost_duration, short, 0644);
-module_param(wake_boost_duration, uint, 0644);
-module_param(input_boost_freq_lp, uint, 0644);
-module_param(input_boost_freq_hp, uint, 0644);
-module_param(min_freq_lp, uint, 0644);
-module_param(min_freq_hp, uint, 0644);
 
 /* The sched_param struct is located elsewhere in newer kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
@@ -66,9 +51,9 @@ static unsigned int get_input_boost_freq(struct cpufreq_policy *policy)
 	unsigned int freq;
 
 	if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
-		freq = max(input_boost_freq_lp, min_freq_lp);
+		freq = max(CONFIG_INPUT_BOOST_FREQ_LP, CONFIG_MIN_FREQ_LP);
 	else
-		freq = max(input_boost_freq_hp, min_freq_hp);
+		freq = max(CONFIG_INPUT_BOOST_FREQ_PERF, CONFIG_MIN_FREQ_PERF);
 
 	return min(freq, policy->max);
 }
@@ -98,12 +83,12 @@ bool cpu_input_boost_within_input(unsigned long timeout_ms)
 
 static void __cpu_input_boost_kick(struct boost_drv *b)
 {
-	if (test_bit(SCREEN_OFF, &b->state) || (input_boost_duration == 0))
+	if (test_bit(SCREEN_OFF, &b->state) || (CONFIG_INPUT_BOOST_DURATION_MS == 0))
 		return;
 
 	set_bit(INPUT_BOOST, &b->state);
 	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
-			      msecs_to_jiffies(input_boost_duration)))
+			      msecs_to_jiffies(CONFIG_INPUT_BOOST_DURATION_MS)))
 		wake_up(&b->boost_waitq);
 }
 
@@ -220,9 +205,9 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 	if (test_bit(INPUT_BOOST, &b->state))
 		policy->min = max(policy->min, get_input_boost_freq(policy));
 	else if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
-		policy->min = max(policy->min, min_freq_lp);
+		policy->min = max(policy->min, CONFIG_MIN_FREQ_LP);
 	else
-		policy->min = max(policy->min, min_freq_hp);
+		policy->min = max(policy->min, CONFIG_MIN_FREQ_PERF);
 
 	return NOTIFY_OK;
 }
@@ -241,7 +226,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb, unsigned long action,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK) {
 		clear_bit(SCREEN_OFF, &b->state);
-		__cpu_input_boost_kick_max(b, wake_boost_duration);
+		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS);
 	} else {
 		set_bit(SCREEN_OFF, &b->state);
 		wake_up(&b->boost_waitq);
