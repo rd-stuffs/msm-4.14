@@ -4429,11 +4429,6 @@ retry:
 	if (gfp_mask & __GFP_NORETRY)
 		goto nopage;
 
-	/* Boost when memory is low so allocation latency doesn't get too bad */
-	cpu_input_boost_kick_max(150);
-	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
-	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
-
 	/*
 	 * Do not retry costly high order allocations unless they are
 	 * __GFP_RETRY_MAYFAIL and we can compact
@@ -4441,6 +4436,11 @@ retry:
 	if (costly_order && (!can_compact ||
 			     !(gfp_mask & __GFP_RETRY_MAYFAIL)))
 		goto nopage;
+
+	/* Boost when memory is low so allocation latency doesn't get too bad */
+	cpu_input_boost_kick_max(150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
 
 	if (should_reclaim_retry(gfp_mask, order, ac, alloc_flags,
 				 did_some_progress > 0, &no_progress_loops))
