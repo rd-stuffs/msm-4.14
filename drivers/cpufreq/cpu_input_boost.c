@@ -200,14 +200,14 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 
 	/*
 	 * Boost to policy->max if the boost frequency is higher. When
-	 * unboosting, set policy->min to the absolute min freq for the CPU.
+	 * unboosting, set policy->min to the configured min freq for the CPU.
 	 */
 	if (test_bit(INPUT_BOOST, &b->state))
 		policy->min = max(policy->min, get_input_boost_freq(policy));
 	else if (cpumask_test_cpu(policy->cpu, cpu_lp_mask))
-		policy->min = max(policy->min, CONFIG_MIN_FREQ_LP);
+		policy->min = CONFIG_MIN_FREQ_LP;
 	else
-		policy->min = max(policy->min, CONFIG_MIN_FREQ_PERF);
+		policy->min = CONFIG_MIN_FREQ_PERF;
 
 	return NOTIFY_OK;
 }
