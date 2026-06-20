@@ -37,7 +37,7 @@ config QCOM_KGSL_IOCOHERENCY_DEFAULT
 
 config QCOM_KGSL_IDLE_TIMEOUT
 	int "GPU idle timeout value"
-	default "100"
+	default "80"
 	help
 	  GPU idle timeout for Adreno GPU. This value decides after how
 	  long the GPU will go into slumber. A higher value will mean that
