@@ -79,14 +79,10 @@ static void update_online_cpu_policy(void)
 
 	/* Only one CPU from each cluster needs to be updated */
 	get_online_cpus();
-	if (input_boost_freq_lp || min_freq_lp) {
-		cpu = cpumask_first_and(cpu_lp_mask, cpu_online_mask);
-		cpufreq_update_policy(cpu);
-	}
-	if (input_boost_freq_hp || min_freq_hp) {
-		cpu = cpumask_first_and(cpu_perf_mask, cpu_online_mask);
-		cpufreq_update_policy(cpu);
-	}
+	cpu = cpumask_first_and(cpu_lp_mask, cpu_online_mask);
+	cpufreq_update_policy(cpu);
+	cpu = cpumask_first_and(cpu_perf_mask, cpu_online_mask);
+	cpufreq_update_policy(cpu);
 	put_online_cpus();
 }
 
@@ -201,13 +197,6 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 	struct cpufreq_policy *policy = data;
 
 	if (action != CPUFREQ_ADJUST)
-		return NOTIFY_OK;
-
-	/* Skip cluster if no boost config is set */
-	if ((cpumask_test_cpu(policy->cpu, cpu_lp_mask) &&
-	     !input_boost_freq_lp && !min_freq_lp) ||
-	    (cpumask_test_cpu(policy->cpu, cpu_perf_mask) &&
-	     !input_boost_freq_hp && !min_freq_hp))
 		return NOTIFY_OK;
 
 	/* Unboost when the screen is off */
