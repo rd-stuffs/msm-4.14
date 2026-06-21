@@ -764,6 +764,9 @@ static void configure_scandump(struct msm_watchdog_data *wdog_dd)
 	static void *dump_vaddr;
 	unsigned int scandump_size;
 
+	if (!IS_ENABLED(CONFIG_QCOM_MEMORY_DUMP_V2))
+		return;
+
 	if (wdog_dd->scandump_size) {
 		register_scan_dump(wdog_dd);
 		return;
