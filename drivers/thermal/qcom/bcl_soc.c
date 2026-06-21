@@ -155,10 +155,14 @@ static int bcl_soc_probe(struct platform_device *pdev)
 	bcl_perph->tz_dev = thermal_zone_of_sensor_register(&pdev->dev,
 				0, bcl_perph, &bcl_perph->ops);
 	if (IS_ERR(bcl_perph->tz_dev)) {
-		pr_err("soc TZ register failed. err:%ld\n",
-				PTR_ERR(bcl_perph->tz_dev));
 		ret = PTR_ERR(bcl_perph->tz_dev);
 		bcl_perph->tz_dev = NULL;
+		if (ret == -ENODEV) {
+			pr_debug("soc TZ not available (DT disabled)\n");
+			ret = 0;
+		} else {
+			pr_err("soc TZ register failed. err:%d\n", ret);
+		}
 		goto bcl_soc_probe_exit;
 	}
 	thermal_zone_device_update(bcl_perph->tz_dev, THERMAL_DEVICE_UP);
