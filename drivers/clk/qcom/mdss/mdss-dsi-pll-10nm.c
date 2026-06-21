@@ -1031,7 +1031,7 @@ static int dsi_pll_10nm_lock_status(struct mdss_pll_resources *pll)
 				       delay_us,
 				       timeout_us);
 	if (rc)
-		pr_err("DSI PLL(%d) lock failed, status=0x%08x\n",
+		pr_debug("DSI PLL(%d) lock failed, status=0x%08x\n",
 			pll->index, status);
 
 	return rc;

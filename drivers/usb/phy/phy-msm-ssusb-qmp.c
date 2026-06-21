@@ -916,7 +916,7 @@ static int msm_ssphy_qmp_extcon_register(struct msm_ssphy_qmp *phy,
 
 	edev = extcon_get_edev_by_phandle(dev, 0);
 	if (IS_ERR(edev)) {
-		dev_err(dev, "failed to get phandle for msm_ssphy_qmp\n");
+		dev_dbg(dev, "failed to get phandle for msm_ssphy_qmp\n");
 		return PTR_ERR(edev);
 	}
 

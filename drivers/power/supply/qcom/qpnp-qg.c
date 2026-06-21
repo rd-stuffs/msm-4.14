@@ -2976,10 +2976,10 @@ static void profile_load_work(struct work_struct *work)
 		pr_info("profile_load_work: QG initialized! battery_profile=%s SOC=%d QG_subtype=%d\n",
 			qg_get_battery_type(chip), soc, chip->qg_subtype);
 	} else {
-		pr_err("profile_load_work is failed.\n");
+		pr_debug("profile_load_work is failed.\n");
 		retry_batt_profile++;
 		if (retry_batt_profile < BATT_PROFILE_RETRY_COUNT_MAX) {
-			pr_err("profile_load_work begin to restart.\n");
+			pr_debug("profile_load_work begin to restart.\n");
 			schedule_delayed_work(&chip->profile_load_work,
 					msecs_to_jiffies(profile_load_period_ms));
 		}
