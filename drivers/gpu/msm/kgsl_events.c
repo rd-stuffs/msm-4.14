@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -53,10 +54,10 @@ const char *prio_to_string(enum kgsl_priority prio)
 
 /**
  * _kgsl_event_worker() - Work handler for processing GPU event callbacks
- * @work: Pointer to the work_struct for the event
+ * @work: Pointer to the kthread_work for the event
  *
- * Each event callback has its own work struct and is run on a event specific
- * workqeuue.  This is the worker that queues up the event callback function.
+ * Each event callback has its own kthread_work struct and is run on a event specific
+ * worker thread.  This is the worker that queues up the event callback function.
  */
 static void _kgsl_event_worker(struct kthread_work *work)
 {
