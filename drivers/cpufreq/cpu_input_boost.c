@@ -73,6 +73,21 @@ static void update_online_cpu_policy(void)
 	put_online_cpus();
 }
 
+static void update_cluster_gov(const struct cpumask *mask,
+			       const char *gov_name)
+{
+	unsigned int cpu;
+
+	get_online_cpus();
+	cpu = cpumask_first_and(mask, cpu_online_mask);
+	if (cpu < nr_cpu_ids) {
+		int ret = cpufreq_set_governor_by_name(cpu, gov_name);
+		if (ret)
+			pr_warn("failed to set cluster governor: %d\n", ret);
+	}
+	put_online_cpus();
+}
+
 bool cpu_input_boost_within_input(unsigned long timeout_ms)
 {
 	struct boost_drv *b = &boost_drv_g;
@@ -162,6 +177,7 @@ static int cpu_boost_thread(void *data)
 	while (1) {
 		bool should_stop = false;
 		unsigned long curr_state;
+		bool screen_off;
 
 		wait_event(b->boost_waitq,
 			(curr_state = READ_ONCE(b->state)) != old_state ||
@@ -169,6 +185,11 @@ static int cpu_boost_thread(void *data)
 
 		if (should_stop)
 			break;
+
+		screen_off = test_bit(SCREEN_OFF, &curr_state);
+		if (screen_off != test_bit(SCREEN_OFF, &old_state))
+			update_cluster_gov(cpu_lp_mask,
+					   screen_off ? "schedutil" : "performance");
 
 		old_state = curr_state;
 		update_online_cpu_policy();
