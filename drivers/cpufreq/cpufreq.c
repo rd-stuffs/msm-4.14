@@ -2388,6 +2388,43 @@ unlock:
 }
 EXPORT_SYMBOL(cpufreq_update_policy);
 
+/**
+ *	cpufreq_set_governor_by_name - switch a CPU's governor by name
+ *	@cpu: target CPU
+ *	@gov_name: name of the governor to switch to
+ *
+ *	Look up a registered governor by name and apply it to the given CPU's
+ *	policy.  Returns 0 on success or a negative errno.
+ */
+int cpufreq_set_governor_by_name(unsigned int cpu, const char *gov_name)
+{
+	struct cpufreq_policy *policy;
+	struct cpufreq_policy new_policy;
+	struct cpufreq_governor *gov;
+	int ret;
+
+	policy = cpufreq_cpu_get(cpu);
+	if (!policy)
+		return -ENODEV;
+
+	gov = find_governor(gov_name);
+	if (!gov) {
+		cpufreq_cpu_put(policy);
+		return -EINVAL;
+	}
+
+	down_write(&policy->rwsem);
+	memcpy(&new_policy, policy, sizeof(new_policy));
+	new_policy.governor = gov;
+
+	ret = cpufreq_set_policy(policy, &new_policy);
+	up_write(&policy->rwsem);
+	cpufreq_cpu_put(policy);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cpufreq_set_governor_by_name);
+
 /*********************************************************************
  *               BOOST						     *
  *********************************************************************/
