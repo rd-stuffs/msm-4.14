@@ -106,7 +106,6 @@ enum print_reason {
 #define CC_UN_COMPLIANT_VOTER		"CC_UN_COMPLIANT_VOTER"
 
 #define JEITA_VOTER                     "JEITA_VOTER"
-#define BYPASS_VOTER			 "BYPASS_VOTER"
 #define GPIO_DCIN_VOTER			"GPIO_DCIN_VOTER"
 
 #define BOOST_BACK_STORM_COUNT	3

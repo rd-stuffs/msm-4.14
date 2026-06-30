@@ -2804,7 +2804,8 @@ int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
   smblib_dbg(chg, PR_MISC, "%s intval= %x\n",__FUNCTION__,val->intval);
 
   if (1 == val->intval) {
-	  rc = vote(chg->chg_disable_votable, BYPASS_VOTER, false, 0);
+	  rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG,
+		  CHARGING_ENABLE_CMD_BIT,CHARGING_ENABLE_CMD_BIT);
 	  if (rc < 0) {
 		  smblib_err(chg, "Couldn't enable charging rc=%d\n",
 					  rc);
@@ -2812,17 +2813,16 @@ int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
 	  }
   }
   else if (0 == val->intval) {
-	  rc = vote(chg->chg_disable_votable, BYPASS_VOTER, true, 0);
+	  rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG,
+		  CHARGING_ENABLE_CMD_BIT,0);
 	  if (rc < 0) {
 		  smblib_err(chg, "Couldn't disable charging rc=%d\n",
 					  rc);
 		  return rc;
 	  }
   }
-  else {
-	  smblib_err(chg, "Invalid charging_enabled value %d\n", val->intval);
-	  return -EINVAL;
-  }
+  else
+	  smblib_err(chg, "Couldn't disable charging rc=%d\n",rc);
 
   return 0;
 }
