@@ -2349,6 +2349,11 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 		break;
 	case DISABLE_CHARGE:
 	case PAUSE_CHARGE:
+		if (chg->bypass_active) {
+			/* gauge needs NOT_CHARGING to track SOC */
+			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			return 0;
+		}
 		/*
 		 * As from jeita status change, there is very short time not charging,
 		 * to improve user experience, we report charging at this moment.
@@ -2804,8 +2809,7 @@ int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
   smblib_dbg(chg, PR_MISC, "%s intval= %x\n",__FUNCTION__,val->intval);
 
   if (1 == val->intval) {
-	  rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG,
-		  CHARGING_ENABLE_CMD_BIT,CHARGING_ENABLE_CMD_BIT);
+	  rc = vote(chg->chg_disable_votable, CHG_ENABLE_VOTER, false, 0);
 	  if (rc < 0) {
 		  smblib_err(chg, "Couldn't enable charging rc=%d\n",
 					  rc);
@@ -2813,18 +2817,47 @@ int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
 	  }
   }
   else if (0 == val->intval) {
-	  rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG,
-		  CHARGING_ENABLE_CMD_BIT,0);
+	  rc = vote(chg->chg_disable_votable, CHG_ENABLE_VOTER, true, 0);
 	  if (rc < 0) {
 		  smblib_err(chg, "Couldn't disable charging rc=%d\n",
 					  rc);
 		  return rc;
 	  }
   }
-  else
-	  smblib_err(chg, "Couldn't disable charging rc=%d\n",rc);
+  else {
+	  smblib_err(chg, "Invalid charging_enabled value %d\n", val->intval);
+	  return -EINVAL;
+  }
 
   return 0;
+}
+
+int smblib_get_prop_charging_bypass(struct smb_charger *chg,
+				union power_supply_propval *val)
+{
+	val->intval = chg->bypass_active;
+	return 0;
+}
+
+int smblib_set_prop_charging_bypass(struct smb_charger *chg,
+				const union power_supply_propval *val)
+{
+	int rc;
+
+	rc = vote(chg->chg_disable_votable, BYPASS_VOTER, (bool)val->intval, 0);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't set charging bypass rc=%d\n", rc);
+		return rc;
+	}
+	chg->bypass_active = (bool)val->intval;
+
+	if (!chg->cp_disable_votable)
+		chg->cp_disable_votable = find_votable("CP_DISABLE");
+	if (chg->cp_disable_votable)
+		vote(chg->cp_disable_votable, BYPASS_VOTER, (bool)val->intval, 0);
+
+	power_supply_changed(chg->batt_psy);
+	return 0;
 }
 
 extern union power_supply_propval lct_therm_lvl_reserved;

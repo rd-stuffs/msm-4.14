@@ -155,6 +155,7 @@ struct qpnp_qg {
 	bool			suspend_data;
 	bool			vbat_low;
 	bool			charge_done;
+	bool			bypass_active;
 	bool			parallel_enabled;
 	bool			usb_present;
 	bool			dc_present;

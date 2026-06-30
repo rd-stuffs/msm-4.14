@@ -106,6 +106,8 @@ enum print_reason {
 #define CC_UN_COMPLIANT_VOTER		"CC_UN_COMPLIANT_VOTER"
 
 #define JEITA_VOTER                     "JEITA_VOTER"
+#define BYPASS_VOTER			"BYPASS_VOTER"
+#define CHG_ENABLE_VOTER		"CHG_ENABLE_VOTER"
 #define GPIO_DCIN_VOTER			"GPIO_DCIN_VOTER"
 
 #define BOOST_BACK_STORM_COUNT	3
@@ -762,6 +764,7 @@ struct smb_charger {
 	/* reduce fcc for esr cal*/
 	int			esr_work_status;
 	bool			cp_charge_enabled;
+	bool			bypass_active;
 	int			charge_type;
 	int			charge_status;
 	int			batt_health;
@@ -1048,6 +1051,10 @@ int smblib_get_prop_charging_enabled(struct smb_charger *chg,
                 union power_supply_propval *val);
 int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
                 const union power_supply_propval *val);
+int smblib_get_prop_charging_bypass(struct smb_charger *chg,
+		union power_supply_propval *val);
+int smblib_set_prop_charging_bypass(struct smb_charger *chg,
+		const union power_supply_propval *val);
 #ifdef CONFIG_REVERSE_CHARGE
 void rerun_reverse_check(struct smb_charger *chg);
 extern char *saved_command_line;

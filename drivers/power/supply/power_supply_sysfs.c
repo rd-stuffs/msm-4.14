@@ -493,6 +493,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(reverse_charge_mode),
 #endif
 	POWER_SUPPLY_ATTR(charge_awske_state),
+	POWER_SUPPLY_ATTR(charging_bypass),
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */

@@ -3019,6 +3019,13 @@ static void qg_status_change_work(struct work_struct *work)
 		chip->charge_status = prop.intval;
 
 	rc = power_supply_get_property(chip->batt_psy,
+			POWER_SUPPLY_PROP_CHARGING_BYPASS, &prop);
+	if (rc < 0)
+		chip->bypass_active = false;
+	else
+		chip->bypass_active = prop.intval;
+
+	rc = power_supply_get_property(chip->batt_psy,
 			POWER_SUPPLY_PROP_CHARGE_DONE, &prop);
 	if (rc < 0)
 		pr_err("Failed to get charge done status, rc=%d\n", rc);
