@@ -3969,7 +3969,7 @@ static int thermal_notifier_callback(struct notifier_block *noti, unsigned long 
 	if (ev_data && ev_data->data && chg) {
 		blank = ev_data->data;
 		if (event == MSM_DRM_EARLY_EVENT_BLANK && *blank == MSM_DRM_BLANK_UNBLANK) {
-			lct_backlight_off = true; /* fake as display off to fasten charging rate */
+			lct_backlight_off = false;
 			schedule_work(&chg->fb_notify_work);
 		}
 		else if (event == MSM_DRM_EVENT_BLANK && *blank == MSM_DRM_BLANK_POWERDOWN) {

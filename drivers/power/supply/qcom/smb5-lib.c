@@ -2835,8 +2835,6 @@ extern int LctThermal;
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
-	int system_temp_level = 0;
-
 	if (val->intval < 0)
 		return -EINVAL;
 
@@ -2861,16 +2859,21 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 		return 0;
 	}
 
-	if (system_temp_level >= chg->thermal_levels)
+	if (val->intval == chg->system_temp_level)
+		return 0;
+
+	chg->system_temp_level = val->intval;
+
+	if (chg->system_temp_level == chg->thermal_levels)
 		return vote(chg->chg_disable_votable,
 			THERMAL_DAEMON_VOTER, true, 0);
 
 	vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
-	if (system_temp_level == 0)
+	if (chg->system_temp_level == 0)
 		return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
 
 	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
-			chg->thermal_mitigation[system_temp_level]);
+			chg->thermal_mitigation[chg->system_temp_level]);
 	return 0;
 }
 
