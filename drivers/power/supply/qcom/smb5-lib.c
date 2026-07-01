@@ -2850,11 +2850,7 @@ int smblib_set_prop_charging_bypass(struct smb_charger *chg,
 		return rc;
 	}
 	chg->bypass_active = (bool)val->intval;
-
-	if (!chg->cp_disable_votable)
-		chg->cp_disable_votable = find_votable("CP_DISABLE");
-	if (chg->cp_disable_votable)
-		vote(chg->cp_disable_votable, BYPASS_VOTER, (bool)val->intval, 0);
+	chg->bq_input_suspend = (bool)val->intval;
 
 	power_supply_changed(chg->batt_psy);
 	return 0;
