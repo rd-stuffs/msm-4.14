@@ -104,8 +104,8 @@ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
 KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
 
 ifeq ($(CONFIG_ARCH_SDMMAGPIE), y)
-KBUILD_CFLAGS  += -mcpu=cortex-a76.cortex-a55
-KBUILD_AFLAGS  += -mcpu=cortex-a76.cortex-a55
+KBUILD_CFLAGS  += $(call cc-option,-mcpu=cortex-a76.cortex-a55,-mcpu=cortex-a76)
+KBUILD_AFLAGS  += $(call cc-option,-mcpu=cortex-a76.cortex-a55,-mcpu=cortex-a76)
 endif
 
 KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
