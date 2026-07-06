@@ -844,7 +844,7 @@ UMAC_TARGET_GPIO_INC := -I $(srctree)/$(WLAN_COMMON_INC)/target_if/gpio
 
 UMAC_GPIO_INC := -I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_GPIO_DISP_INC_DIR) \
 			-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_GPIO_CORE_INC_DIR) \
-			-I $(srctree)/$(WLAN_COMMON_INC)/$(UMAC_TARGET_GPIO_INC)
+			$(UMAC_TARGET_GPIO_INC)
 ifeq ($(CONFIG_FEATURE_GPIO_CFG),y)
 UMAC_GPIO_OBJS := $(UMAC_GPIO_DISP_DIR)/wlan_gpio_tgt_api.o \
 		$(UMAC_GPIO_DISP_DIR)/wlan_gpio_ucfg_api.o \
