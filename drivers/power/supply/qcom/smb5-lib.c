@@ -9830,6 +9830,8 @@ int smblib_init(struct smb_charger *chg)
 			return rc;
 		}
 
+		rerun_election(chg->chg_disable_votable);
+
 		chg->bms_psy = power_supply_get_by_name("bms");
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 		chg->batt_verify_psy = power_supply_get_by_name("batt_verify");
