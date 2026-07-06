@@ -102,6 +102,7 @@ modpost_link()
 
 	objects="--whole-archive				\
 		built-in.a					\
+		${no_whole_archive}				\
 		--start-group					\
 		${KBUILD_VMLINUX_LIBS}				\
 		--end-group"
@@ -150,6 +151,7 @@ vmlinux_link()
 		if [ -z "${CONFIG_LTO_CLANG}" ]; then
 			objects="--whole-archive		\
 				built-in.a			\
+				${no_whole_archive}		\
 				--start-group			\
 				${KBUILD_VMLINUX_LIBS}		\
 				--end-group			\
@@ -166,6 +168,7 @@ vmlinux_link()
 	else
 		objects="-Wl,--whole-archive			\
 			built-in.a				\
+			${no_whole_archive_um}			\
 			-Wl,--start-group			\
 			${KBUILD_VMLINUX_LIBS}			\
 			-Wl,--end-group				\
@@ -336,6 +339,13 @@ case "${KCONFIG_CONFIG}" in
 	# Force using a file from the current directory
 	. "./${KCONFIG_CONFIG}"
 esac
+
+no_whole_archive="--no-whole-archive"
+no_whole_archive_um="-Wl,--no-whole-archive"
+if [ -n "${CONFIG_LTO_GCC}" ]; then
+	no_whole_archive=
+	no_whole_archive_um=
+fi
 
 # Update version
 info GEN .version
