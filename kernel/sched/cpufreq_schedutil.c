@@ -730,7 +730,7 @@ static ssize_t rate_limit_us_show(struct gov_attr_set *attr_set, char *buf)
 {
 	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
 
-	return sprintf(buf, "%u\n", tunables->rate_limit_us);
+	return sysfs_emit(buf, "%u\n", tunables->rate_limit_us);
 }
 
 static ssize_t rate_limit_us_store(struct gov_attr_set *attr_set,
@@ -745,7 +745,7 @@ static ssize_t response_time_ms_show(struct gov_attr_set *attr_set, char *buf)
 {
 	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
 
-	return sprintf(buf, "%u\n", tunables->response_time_ms);
+	return sysfs_emit(buf, "%u\n", tunables->response_time_ms);
 }
 
 static ssize_t
