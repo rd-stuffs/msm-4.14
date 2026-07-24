@@ -1,3 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2026 \xx
+ *
+ * This file is a downstream extension and NOT affiliated, endorsed by,
+ * or maintained by the official KernelSU developers.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ */
+
 #ifndef __KSU_H_KERNEL_INCLUDES
 #define __KSU_H_KERNEL_INCLUDES
 
@@ -22,7 +35,6 @@
 #include <linux/errno.h>
 #include <linux/export.h>
 #include <linux/fdtable.h>
-#include <linux/fsnotify_backend.h>
 #include <linux/file.h>
 #include <linux/filter.h>
 #include <linux/fs.h>
@@ -32,8 +44,10 @@
 #include <linux/init_task.h>
 #include <linux/input.h>
 #include <linux/ioctl.h>
+#include <linux/jump_label.h>
 #include <linux/kernel.h>
 #include <linux/kobject.h>
+#include <linux/kref.h>
 #include <linux/kthread.h>
 #include <linux/limits.h>
 #include <linux/list.h>
@@ -72,6 +86,10 @@
 #include <linux/vmalloc.h>
 
 // versioned / conditional
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+#include <linux/hex.h>
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 #include <linux/stop_machine.h>
@@ -128,12 +146,39 @@
 #include <linux/sched/user.h>
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
+#include <linux/hashtable.h>
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
 #include <linux/task_work.h>
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 #include <linux/lsm_hooks.h>
+#endif
+
+#ifdef CONFIG_KPROBES
+#include <linux/kprobes.h>
+#endif
+
+/**
+ * Linux kernel forbids c99 restrict
+ * however we can use builtin's restrict
+ */
+#define restrict __restrict
+
+/**
+ * old compilers does NOT know fallthrough, this is GNU/C23
+ * however we can use a comment and it silences it
+ * ref: https://elixir.bootlin.com/linux/v4.4.302/source/tools/include/linux/compiler.h#L121
+ */
+#ifndef fallthrough
+# if defined(__GNUC__) && __GNUC__ >= 7
+#  define fallthrough __attribute__ ((fallthrough))
+# else
+#  define fallthrough do {} while (0) /* fallthrough */
+# endif
 #endif
 
 /**
@@ -144,20 +189,29 @@
  * https://github.com/gcc-mirror/gcc/blob/releases/gcc-4.9/gcc/builtins.def#L562
  *
  */
-#if !defined(CONFIG_FORTIFY_SOURCE)
+#if !defined(CONFIG_KSU_DEBUG)
 
-#define memcmp __builtin_memcmp
-#define memcpy __builtin_memcpy
-#define memmove __builtin_memmove
-#define memset __builtin_memset
-#define strchr __builtin_strchr
-#define strcmp __builtin_strcmp
-#define strcpy __builtin_strcpy
-#define strlen __builtin_strlen
-#define strncmp __builtin_strncmp
-#define strncpy __builtin_strncpy
-#define strstr __builtin_strstr
+#define memchr		__builtin_memchr
+#define memcmp		__builtin_memcmp
+#define memcpy		__builtin_memcpy
+#define memmove		__builtin_memmove
+#define memset		__builtin_memset
+#define strcasecmp	__builtin_strcasecmp
+#define strcat		__builtin_strcat
+#define strchr		__builtin_strchr
+#define strcmp		__builtin_strcmp
+#define strcpy		__builtin_strcpy
+#define strcspn		__builtin_strcspn
+#define strlen		__builtin_strlen
+#define strncasecmp	__builtin_strncasecmp
+#define strncat		__builtin_strncat
+#define strncmp		__builtin_strncmp
+#define strncpy		__builtin_strncpy
+#define strpbrk		__builtin_strpbrk
+#define strrchr		__builtin_strrchr
+#define strspn		__builtin_strspn
+#define strstr		__builtin_strstr
 
-#endif // !CONFIG_FORTIFY_SOURCE
+#endif // !CONFIG_KSU_DEBUG
 
 #endif // __KSU_H_KERNEL_INCLUDES

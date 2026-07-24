@@ -141,7 +141,11 @@ fi
 if [[ $KSU == "true" ]]; then
 	printf "Building KernelSU variant...\n"
 	ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
-	scripts/config --file out/.config -e KSU
+	scripts/config --file out/.config \
+		-e KSU \
+		-e KSU_TAMPER_SYSCALL_TABLE \
+		-d KSU_FEATURE_SULOG \
+		-e KSU_THRONE_TRACKER_ALWAYS_THREADED
 	"${MAKE[@]}" olddefconfig &>/dev/null
 fi
 
