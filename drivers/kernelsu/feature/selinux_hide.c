@@ -50,20 +50,6 @@ static inline int ksu_selinux_get_sids()
 	return 0;
 }
 
-void ksu_slow_avc_audit(u32 *tsid)
-{
-	if (unlikely(!ksu_selinux_hide_enabled))
-		return;
-
-	if (*tsid != ksu_sid)
-		return;
-
-	pr_info("selinux_hide: slow_avc_audit: replace tsid: %u with priv_app_sid: %u\n", *tsid, priv_app_sid);
-	*tsid = priv_app_sid;
-
-	return;
-}
-
 static bool ksu_should_destroy_context(char *str)
 {
 	if (!str)
@@ -190,55 +176,23 @@ static __always_inline int ksu_hide_setprocattr_inline(const char *name, void *v
 	return 0;
 }
 
-#if defined(CONFIG_KPROBES)
-
-#include <linux/kprobes.h>
-static struct kprobe *slow_avc_audit_kp;
-
-static int slow_avc_audit_pre_handler(struct kprobe *p, struct pt_regs *regs)
-{
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0) && defined(KSU_COMPAT_HAS_SELINUX_STATE)
-	u32 *tsid = (u32 *)&PT_REGS_PARM3(regs);
-#else
-	u32 *tsid = (u32 *)&PT_REGS_PARM2(regs);
-#endif
-
-	ksu_slow_avc_audit(tsid);
-
-	return 0;
-}
-
-#endif // CONFIG_KPROBES
-
-
 static void ksu_selinux_hide_enable() 
 {
 	int ret = ksu_selinux_get_sids();
 	if (ret)
 		pr_info("selinux_hide: sid grab fail?\n");
 
-#if defined(CONFIG_KPROBES)
-	slow_avc_audit_kp = init_kprobe("slow_avc_audit", slow_avc_audit_pre_handler);
-#endif
-
 	ksu_selinux_hide_enabled = true;
 }
 
 static void ksu_selinux_hide_disable()
 {
-#if defined(CONFIG_KPROBES)
-	pr_info("selinux_hide: unregister slow_avc_audit kprobe!\n");
-	destroy_kprobe(&slow_avc_audit_kp);
-#endif
-
 	pr_info("selinux_hide: closing down hooks!\n");
 
 	ksu_selinux_hide_enabled = false;
 }
 
 // selinux_transaction_write hijack
-
 static ssize_t (*selinux_transaction_write_fn)(struct file *file, const char __user *buf, size_t size, loff_t *pos) __read_mostly = NULL;
 static __nocfi ssize_t ksu_selinux_transaction_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
 {
@@ -505,6 +459,9 @@ try_again:
 
 page_ok:
 	ksu_init_hook_selinux_status_open();
+	
+	// downstream/slow_avc_audit_defs.c
+	ksu_init_slow_avc_audit_hook();
 
 	return 0;
 }

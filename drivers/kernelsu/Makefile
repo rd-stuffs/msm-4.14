@@ -11,15 +11,15 @@ MDIR := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 $(info -- KDIR: $(KDIR))
 $(info -- MDIR: $(MDIR))
 
-# compliant to last upstream kernel change as of e9e5b61
-CFLAGS_ksu.o += -DKSU_VERSION=32558
+# compliant to last upstream kernel change as of 953b403
+CFLAGS_ksu.o += -DKSU_VERSION=32567
 
 ifndef KSU_EXPECTED_SIZE
-KSU_EXPECTED_SIZE := 0x033b
+KSU_EXPECTED_SIZE := 0x0363
 endif
 
 ifndef KSU_EXPECTED_HASH
-KSU_EXPECTED_HASH := c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6
+KSU_EXPECTED_HASH := 36a7664f84270a8ccd0c0c332bbf3e67b4f7ade7a52f8343c73fd8e32c59eb38
 endif
 
 ifdef KSU_MANAGER_PACKAGE
@@ -96,6 +96,7 @@ endif
 
 CFLAGS_ksu.o += $(call cc-option, -Wno-declaration-after-statement)
 CFLAGS_ksu.o += $(call cc-option, -Wno-implicit-function-declaration)
+CFLAGS_ksu.o += $(call cc-option, -Wno-missing-prototypes)
 CFLAGS_ksu.o += $(call cc-option, -Wno-strict-prototypes)
 CFLAGS_ksu.o += $(call cc-option, -Wno-int-conversion)
 CFLAGS_ksu.o += $(call cc-option, -Wno-int-to-pointer-cast)
@@ -117,21 +118,24 @@ CFLAGS_ksu.o += $(call cc-option, -Wframe-larger-than=1024)
 # to make sure we can use builtins
 CFLAGS_REMOVE_ksu.o += -fno-builtin
 
+# a little respect to kbuild
+ifeq ($(CONFIG_CC_OPTIMIZE_FOR_SIZE),y)
+CFLAGS_REMOVE_ksu.o += -Oz
+CFLAGS_REMOVE_ksu.o += -Os
+CFLAGS_ksu.o += -O2
+else
+CFLAGS_ksu.o += -O3
+endif
+
 ifneq ($(CONFIG_KSU_DEBUG),y)
 # strip, remove tracing / profiling
 # comment out if proper backtrace is needed
-CFLAGS_ksu.o += -O3
 CFLAGS_ksu.o += -g0 -fno-unwind-tables -fno-asynchronous-unwind-tables -fomit-frame-pointer
 CFLAGS_ksu.o += $(call cc-option, -momit-leaf-frame-pointer)
 
 # no profiling
 CFLAGS_REMOVE_ksu.o = $(CC_FLAGS_FTRACE)
 CFLAGS_REMOVE_ksu.o += -pg
-
-# hot paths dont have loops so lets make code smaller
-CFLAGS_ksu.o += $(call cc-option, -fno-unroll-loops)
-CFLAGS_ksu.o += $(call cc-option, -fno-unswitch-loops) # gcc
-CFLAGS_ksu.o += $(call cc-option, -fno-vectorize)
 
 # if cflags can be macro'd, this will be called 'TRUST_ME'
 CFLAGS_ksu.o += -fno-stack-protector -fno-stack-check
