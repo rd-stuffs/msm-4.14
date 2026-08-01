@@ -9,7 +9,7 @@ if [[ -n $(git status --porcelain) ]]; then
 fi
 
 url=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
-	https://github.com/backslashxx/KernelSU/releases/latest)
+	https://github.com/rd-stuffs/KernelSU/releases/latest)
 tag=${url##*/}
 
 if [[ -z $tag || $tag == latest ]]; then
@@ -21,7 +21,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 git clone --quiet --depth 1 --branch "$tag" \
-	https://github.com/backslashxx/KernelSU.git "$tmp/KernelSU"
+	https://github.com/rd-stuffs/KernelSU.git "$tmp/KernelSU"
 
 rm -rf drivers/kernelsu
 cp -a "$tmp/KernelSU/kernel" drivers/kernelsu
