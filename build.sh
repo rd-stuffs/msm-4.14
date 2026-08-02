@@ -110,6 +110,7 @@ fi
 CLEAN="false"
 LTO="false"
 KSU="false"
+IMAGES_ONLY="false"
 
 for arg in "$@"; do
 	case $arg in
@@ -121,6 +122,9 @@ for arg in "$@"; do
 		;;
 	-s | --su)
 		KSU="true"
+		;;
+	-i | --images-only)
+		IMAGES_ONLY="true"
 		;;
 	*)
 		printf "Unknown argument: %s\n" "$arg"
@@ -167,6 +171,13 @@ dtbo_miui="out/arch/arm64/boot/dtbo-miui.img"
 if [ ! -f "$kernel" ] || [ ! -f "$dtb" ] || [ ! -f "$dtbo" ] || [ ! -f "$dtbo_miui" ]; then
 	printf "\nMissing build artifacts, aborting.\n"
 	exit 1
+fi
+
+if [[ $IMAGES_ONLY == "true" ]]; then
+	printf "\nImages compiled successfully!\n"
+	printf "\nCompleted in %d minute(s) and %d second(s)!\n" $((BUILD_TIME / 60)) $((BUILD_TIME % 60))
+	printf "Images: %s\n" "$kernel $dtb $dtbo $dtbo_miui"
+	exit 0
 fi
 
 printf "\nKernel compiled successfully! Zipping up...\n"
