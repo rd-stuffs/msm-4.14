@@ -35,7 +35,7 @@
 /*
  * Allow wakeup-time preemption of the current task:
  */
-#define SCHED_FEAT_WAKEUP_PREEMPTION 1
+#define SCHED_FEAT_WAKEUP_PREEMPTION 0
 
 #define SCHED_FEAT_HRTICK 0
 #define SCHED_FEAT_DOUBLE_TICK 0
