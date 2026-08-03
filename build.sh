@@ -90,8 +90,6 @@ MAKE=(
 )
 
 if [[ ${1:-} == -r || ${1:-} == --regen ]]; then
-	"${MAKE[@]}" vendor/surya-stock_defconfig savedefconfig
-	cp out/defconfig arch/arm64/configs/vendor/surya-stock_defconfig
 	"${MAKE[@]}" $DEFCONFIG savedefconfig
 	cp out/defconfig arch/arm64/configs/$DEFCONFIG
 	printf "\nSuccessfully regenerated defconfig at %s\n" $DEFCONFIG
@@ -99,8 +97,6 @@ if [[ ${1:-} == -r || ${1:-} == --regen ]]; then
 fi
 
 if [[ ${1:-} == -rf || ${1:-} == --regen-full ]]; then
-	"${MAKE[@]}" vendor/surya-stock_defconfig
-	cp out/.config arch/arm64/configs/vendor/surya-stock_defconfig
 	"${MAKE[@]}" $DEFCONFIG
 	cp out/.config arch/arm64/configs/$DEFCONFIG
 	printf "\nSuccessfully regenerated full defconfig at %s\n" $DEFCONFIG
