@@ -3291,13 +3291,17 @@ u64 approximate_runtime(unsigned long util)
 	struct sched_avg sa = {};
 	u64 runtime = 0;
 
-	while (sa.util_avg < util) {
+	while (sa.util_avg < util && runtime < SCHED_CAPACITY_SCALE) {
 		sa.util_sum = decay_load(sa.util_sum, 1);
 		sa.util_sum += (u64)__accumulate_pelt_segments(1, 1024, 0) <<
 				SCHED_CAPACITY_SHIFT;
 		sa.util_avg = sa.util_sum / (LOAD_AVG_MAX - 1024);
 		runtime++;
 	}
+
+	if (runtime >= SCHED_CAPACITY_SCALE)
+		pr_warn_once("approximate_runtime: target %lu unreachable, DVFS headroom response time degraded\n",
+				util);
 
 	return runtime;
 }
