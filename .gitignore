@@ -133,3 +133,10 @@ AnyKernel3/
 log.txt
 *.zip
 tc/
+
+# Kernel review artifacts
+review-inline.txt
+review-metadata.json
+/series-cover-letter.txt
+/series-metadata.json
+/series-summary.txt
