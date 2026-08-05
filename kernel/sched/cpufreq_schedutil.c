@@ -755,7 +755,7 @@ response_time_ms_store(struct gov_attr_set *attr_set, const char *buf, size_t co
 	struct sugov_policy *sg_policy;
 	unsigned int response_time_ms;
 
-	if (kstrtouint(buf, 10, &response_time_ms))
+	if (kstrtouint(buf, 10, &response_time_ms) || !response_time_ms)
 		return -EINVAL;
 
 	/* XXX need special handling for high values? */

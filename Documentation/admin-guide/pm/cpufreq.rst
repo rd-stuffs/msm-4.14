@@ -424,7 +424,7 @@ This governor exposes two tunables:
 	The purpose of this tunable is to reduce the scheduler context overhead
 	of the governor which might be excessive without it.
 
-``respone_time_ms``
+``response_time_ms``
 	Amount of time (in milliseconds) required to ramp the policy from
 	lowest to highest frequency. Can be decreased to speed up the
 	responsiveness of the system, or increased to slow the system down in
