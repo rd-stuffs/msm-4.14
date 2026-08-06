@@ -74,17 +74,25 @@
 
 int suid_dumpable = 0;
 
-#define PERFD_BIN "/vendor/bin/hw/vendor.qti.hardware.perf2-hal-service"
 #define SERVICEMANAGER_BIN "/system/bin/servicemanager"
 
-static struct task_struct *perfd_tsk;
-bool task_is_perfd(struct task_struct *p)
+#define PERF_BIN "/vendor/bin/hw/vendor.qti.hardware.perf@2.2-service"
+#define PERFD_BIN "/vendor/bin/hw/vendor.qti.hardware.perf-hal-service"
+#define PERFD2_BIN "/vendor/bin/hw/vendor.qti.hardware.perf2-hal-service"
+
+#define IOP_BIN "/vendor/bin/hw/vendor.qti.hardware.iop@2.0-service"
+
+#define LIBPERFMGR_LINEAGE_BIN "/vendor/bin/hw/android.hardware.power-service.lineage-libperfmgr"
+#define LIBPERFMGR_XIAOMI_BIN "/vendor/bin/hw/android.hardware.power-service.xiaomi-libperfmgr"
+
+static struct task_struct *powerhal_tsk;
+bool task_is_powerhal(struct task_struct *p)
 {
 	struct task_struct *tsk;
 	bool ret;
 
 	rcu_read_lock();
-	tsk = READ_ONCE(perfd_tsk);
+	tsk = READ_ONCE(powerhal_tsk);
 	ret = tsk && same_thread_group(p, tsk);
 	rcu_read_unlock();
 
@@ -99,8 +107,8 @@ bool task_is_servicemanager(struct task_struct *p)
 
 void dead_special_task(void)
 {
-	if (unlikely(current == perfd_tsk))
-		WRITE_ONCE(perfd_tsk, NULL);
+	if (unlikely(current == powerhal_tsk))
+		WRITE_ONCE(powerhal_tsk, NULL);
 	else if (unlikely(current == servicemanager_tsk))
 		WRITE_ONCE(servicemanager_tsk, NULL);
 }
@@ -1917,11 +1925,26 @@ static int __do_execve_file(int fd, struct filename *filename,
 		goto out;
 
 	if (is_global_init(current->parent)) {
-		if (unlikely(!strcmp(filename->name, PERFD_BIN))) {
-			WRITE_ONCE(perfd_tsk, current);
-		}
-		else if (unlikely(!strcmp(filename->name, SERVICEMANAGER_BIN))) {
+		if (unlikely(!strcmp(filename->name, SERVICEMANAGER_BIN))) {
 			WRITE_ONCE(servicemanager_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, PERF_BIN))) {
+			WRITE_ONCE(powerhal_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, PERFD_BIN))) {
+			WRITE_ONCE(powerhal_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, PERFD2_BIN))) {
+			WRITE_ONCE(powerhal_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, IOP_BIN))) {
+			WRITE_ONCE(powerhal_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, LIBPERFMGR_LINEAGE_BIN))) {
+			WRITE_ONCE(powerhal_tsk, current);
+		}
+		else if (unlikely(!strcmp(filename->name, LIBPERFMGR_XIAOMI_BIN))) {
+			WRITE_ONCE(powerhal_tsk, current);
 		}
 		else if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN))) {
 			zygote32_sig = current->signal;
