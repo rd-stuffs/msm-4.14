@@ -12,7 +12,7 @@ TAG=$(date '+%d%m%Y')
 WD="$(pwd)"
 
 kernel="out/arch/arm64/boot/Image.gz"
-dtb="out/arch/arm64/boot/dtb.img"
+dtb="out/arch/arm64/boot/dts/qcom/sdmmagpie.dtb"
 dtbo="out/arch/arm64/boot/dtbo.img"
 
 if [ ! -f "$kernel" ] || [ ! -f "$dtb" ] || [ ! -f "$dtbo" ]; then
@@ -20,7 +20,7 @@ if [ ! -f "$kernel" ] || [ ! -f "$dtb" ] || [ ! -f "$dtbo" ]; then
 	exit 1
 fi
 
-if [ ! -d out/usr/include ]; then
+if [ ! -d out/usr ]; then
 	printf "Missing kernel headers, run build.sh first.\n"
 	exit 1
 fi
@@ -39,17 +39,27 @@ for arg in "$@"; do
 done
 
 rm -rf out/prebuilt
-mkdir -p out/prebuilt/kernel-headers
-cp "$kernel" "$dtb" "$dtbo" out/prebuilt
-cp -r out/usr/include/. out/prebuilt/kernel-headers
-cp -r out/usr/techpack out/prebuilt/kernel-headers
+mkdir -p out/prebuilt/kernel-headers/usr
+mkdir -p out/prebuilt/dtb
+cp "$kernel" "$dtbo" out/prebuilt
+cp "$dtb" out/prebuilt/dtb
+rsync -a --exclude='*.install*' out/usr/include out/usr/techpack out/prebuilt/kernel-headers/usr
 
-cat > out/prebuilt/Android.bp << 'EOF'
-kernel_headers {
-	name: "qti_kernel_headers",
-	recovery_available: true,
-	vendor_available: true
-}
+VERSION=$(sed -n 's/^VERSION = *//p' Makefile)
+PATCHLEVEL=$(sed -n 's/^PATCHLEVEL = *//p' Makefile)
+SUBLEVEL=$(sed -n 's/^SUBLEVEL = *//p' Makefile)
+
+cat > out/prebuilt/kernel-headers/Makefile << EOF
+VERSION = $VERSION
+PATCHLEVEL = $PATCHLEVEL
+SUBLEVEL = $SUBLEVEL
+
+headers_install:
+	@mkdir -p \$(O)/usr
+	@rsync -mrq \$(shell pwd)/* \$(O)/
+
+all:
+	@true
 EOF
 
 INFO="HEAD: $(git rev-parse --verify HEAD)
@@ -59,7 +69,7 @@ if [[ $RELEASE == "true" ]]; then
 	if [ ! -d out/prebuilt-release ]; then
 		git clone -b main "$REMOTE" out/prebuilt-release
 	fi
-	rm -rf out/prebuilt-release/kernel-headers
+	rm -rf out/prebuilt-release/*
 	cp -r out/prebuilt/. out/prebuilt-release
 
 	git -C out/prebuilt-release add -A
