@@ -4,7 +4,7 @@
  * them to run sooner, but does not allow tons of sleepers to
  * rip the spread apart.
  */
-#define SCHED_FEAT_GENTLE_FAIR_SLEEPERS 1
+#define SCHED_FEAT_GENTLE_FAIR_SLEEPERS 0
 
 /*
  * Place new tasks ahead so that they do not starve already running
@@ -17,7 +17,7 @@
  * wakeup-preemption), since its likely going to consume data we
  * touched, increases cache locality.
  */
-#define SCHED_FEAT_NEXT_BUDDY 1
+#define SCHED_FEAT_NEXT_BUDDY 0
 
 /*
  * Prefer to schedule the task that ran last (when we did
