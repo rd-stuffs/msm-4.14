@@ -54,6 +54,7 @@
 #include <linux/lockdep.h>
 #include <linux/lsm_audit.h>
 #include <linux/mm.h>
+#include <linux/mman.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/mount.h>
@@ -190,21 +191,57 @@
 #endif
 
 /**
+ * static_assert is C23
+ * this has an alternative available on C11 capable compilers.
+ * ref: https://elixir.bootlin.com/linux/v5.1/source/include/linux/build_bug.h
+ *
+ * static_assert(condition); - condition becomes the comment
+ * static_assert(condition, "comment");
+ */
+#ifndef static_assert
+#define __static_assert(expr, msg, ...) _Static_assert(expr, msg)
+#define static_assert(expr, ...) __static_assert(expr, ##__VA_ARGS__, #expr)
+#endif
+
+/**
  * we do NOT have memset_explicit on the linux kernel
  *
  * from: OPENSSL_cleanse, volatile function pointer prevents memset optimization
  * https://github.com/openssl/openssl/blob/master/crypto/mem_clr.c
  * 
  */
-static typeof(memset) *volatile memset_fnptr = memset;
-static __nocfi void *memset_explicit(void *s, int c, size_t count)
+static __nocfi __always_inline void *memset_explicit(void *s, int c, size_t count)
 {
+	static typeof(memset) *volatile memset_fnptr = memset;
 	return memset_fnptr(s, c, count);
 }
 
-// pseudo-raii / defer on C via __attribute__((__cleanup__()))
+/**
+ * __attribute__((__cleanup__()))
+ * - pseudo-raii / defer / scoped cleanup on C 
+ *
+ * NOTE: passes address of variable attributed to fn()
+ */
 #ifndef __cleanup
 #define __cleanup(fn) __attribute__((__cleanup__(fn)))
+#endif
+
+// check for guaranteed inline routines
+// if unavailable, use plain builtin
+#ifndef __has_builtin
+#define __has_builtin(x) (0)
+#endif
+
+#if __has_builtin(__builtin_memcpy_inline)
+#define memcpy_inline	__builtin_memcpy_inline
+#else
+#define memcpy_inline	__builtin_memcpy
+#endif
+
+#if __has_builtin(__builtin_memset_inline)
+#define memset_inline	__builtin_memset_inline
+#else
+#define memset_inline	__builtin_memset
 #endif
 
 /**
@@ -239,5 +276,23 @@ static __nocfi void *memset_explicit(void *s, int c, size_t count)
 #define strstr		__builtin_strstr
 
 #endif // !CONFIG_KSU_DEBUG
+
+/**
+ * redirect all dmesg/printk logging messages to kernel's no_printk macro.
+ * this is an option offerred to shut up KernelSU's routine logging.
+ *
+ */
+#if defined(CONFIG_KSU_NOPRINTK) && !defined(CONFIG_KSU_DEBUG)
+#define pr_emerg(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_alert(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_crit(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_err(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_warn(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_notice(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_info(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_debug(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define pr_devel(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#define printk(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+#endif // CONFIG_KSU_NOPRINTK && !CONFIG_KSU_DEBUG
 
 #endif // __KSU_H_KERNEL_INCLUDES
