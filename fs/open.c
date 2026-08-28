@@ -1111,11 +1111,17 @@ static bool libperfmgr_redirect(struct file **f, int dfd, struct filename *n,
 #define ALLOWED_FLAGS  (REQUIRED_FLAGS | O_TRUNC | O_LARGEFILE)
 	if (likely(*f != ERR_PTR(-ENOENT) ||
 	    (flags & REQUIRED_FLAGS) != REQUIRED_FLAGS ||
-	    flags & ~ALLOWED_FLAGS ||
-	    !task_is_powerhal(current)))
+	    flags & ~ALLOWED_FLAGS))
 		return false;
 #undef ALLOWED_FLAGS
 #undef REQUIRED_FLAGS
+
+	if (!strcmp(n->name, "/sys/kernel/tracing/trace_marker") ||
+	    !strcmp(n->name, "/sys/kernel/debug/tracing/trace_marker"))
+		goto redir;
+
+	if (!task_is_powerhal(current))
+		return false;
 
 	/*
 	 * Check that the file is a pseudo kernel file. tracefs and debugfs are
@@ -1128,6 +1134,7 @@ static bool libperfmgr_redirect(struct file **f, int dfd, struct filename *n,
 		return false;
 #undef STARTS_WITH
 
+redir:
 	/* Redirect the attempt to /dev/null instead */
 	redir_name = getname_kernel("/dev/null");
 	if (IS_ERR(redir_name))
