@@ -67,7 +67,7 @@ static int cpu_subsys_online(struct device *dev)
 
 static int cpu_subsys_offline(struct device *dev)
 {
-	return cpu_down(dev->id);
+	return 0;
 }
 
 void unregister_cpu(struct cpu *cpu)
