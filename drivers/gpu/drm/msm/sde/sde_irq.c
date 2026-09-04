@@ -14,6 +14,7 @@
 
 #include <linux/irqdomain.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/kthread.h>
 
 #include "sde_irq.h"
@@ -32,10 +33,17 @@ void sde_irq_update(struct msm_kms *msm_kms, bool enable)
 
 	sde_kms->irq_enabled = enable;
 
-	if (enable)
+	if (enable) {
+		/*
+		 * Non-boot CPUs are taken offline during suspend, which
+		 * migrates this interrupt away from CPU 2; re-pin it now
+		 * that all CPUs are back online.
+		 */
+		irq_set_affinity(sde_kms->irq_num, cpumask_of(2));
 		enable_irq(sde_kms->irq_num);
-	else
+	} else {
 		disable_irq(sde_kms->irq_num);
+	}
 }
 
 irqreturn_t sde_irq(struct msm_kms *kms)
@@ -110,6 +118,8 @@ void sde_irq_preinstall(struct msm_kms *kms)
 	/* disable irq until power event enables it */
 	if (!sde_kms->splash_data.num_splash_displays && !sde_kms->irq_enabled)
 		irq_set_status_flags(sde_kms->irq_num, IRQ_NOAUTOEN);
+
+	irq_set_status_flags(sde_kms->irq_num, IRQ_NO_BALANCING);
 }
 
 int sde_irq_postinstall(struct msm_kms *kms)
@@ -121,6 +131,8 @@ int sde_irq_postinstall(struct msm_kms *kms)
 		SDE_ERROR("invalid parameters\n");
 		return -EINVAL;
 	}
+
+	irq_set_affinity(sde_kms->irq_num, cpumask_of(2));
 
 	rc = sde_core_irq_postinstall(sde_kms);
 
