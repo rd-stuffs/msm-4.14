@@ -5,11 +5,35 @@
 
 set -euo pipefail
 
-trap 'printf "\nInterrupted.\n"; exit 1' INT
+trap 'echo -e "\nInterrupted."; exit 1' INT
 
 WD="$(pwd)"
 ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
 DEFCONFIG="surya_defconfig"
+
+CLEAN="false"
+LTO="false"
+KSU="false"
+
+if [[ ${1:-} != -r && ${1:-} != --regen && ${1:-} != -rf && ${1:-} != --regen-full ]]; then
+	for arg in "$@"; do
+		case $arg in
+		-c | --clean)
+			CLEAN="true"
+			;;
+		-l | --lto)
+			LTO="true"
+			;;
+		-s | --su)
+			KSU="true"
+			;;
+		*)
+			echo "Unknown argument: $arg"
+			exit 1
+			;;
+		esac
+	done
+fi
 
 GCC64_DIR="$WD/tc/gcc-arm64"
 GCC32_DIR="$WD/tc/gcc-arm"
@@ -33,7 +57,7 @@ if [ -d "$GCC64_DIR" ] && [ -d "$GCC32_DIR" ]; then
 		fi
 
 		if [[ "$GCC_INSTALLED_TAG" != "$GCC_TAG" ]]; then
-			printf "Eva GCC update available (%s). Update? [y/N] " "$GCC_TAG"
+			echo -n "Eva GCC update available ($GCC_TAG). Update? [y/N] "
 			read -r GCC_UPDATE
 			if [[ ${GCC_UPDATE,,} == y ]]; then
 				rm -rf "$GCC64_DIR" "$GCC32_DIR"
@@ -44,11 +68,11 @@ fi
 
 if [ ! -d "$GCC64_DIR" ] || [ ! -d "$GCC32_DIR" ]; then
 	if [ -z "$GCC_TAG" ]; then
-		printf "No internet connection and toolchain is missing, aborting.\n"
+		echo "No internet connection and toolchain is missing, aborting."
 		exit 1
 	fi
 	if [ ! -d "$GCC64_DIR" ]; then
-		printf "Downloading Eva GCC arm64 (%s)...\n" "$GCC_TAG"
+		echo "Downloading Eva GCC arm64 ($GCC_TAG)..."
 		mkdir -p "$GCC64_DIR"
 		curl -fL# "$GCC_DOWNLOAD_URL/$GCC_TAG/eva-gcc-arm64-$GCC_TAG.xz" |
 			tar xf - --strip-components=1 -C "$GCC64_DIR"
@@ -56,7 +80,7 @@ if [ ! -d "$GCC64_DIR" ] || [ ! -d "$GCC32_DIR" ]; then
 	fi
 
 	if [ ! -d "$GCC32_DIR" ]; then
-		printf "Downloading Eva GCC arm (%s)...\n" "$GCC_TAG"
+		echo "Downloading Eva GCC arm ($GCC_TAG)..."
 		mkdir -p "$GCC32_DIR"
 		curl -fL# "$GCC_DOWNLOAD_URL/$GCC_TAG/eva-gcc-arm-$GCC_TAG.xz" |
 			tar xf - --strip-components=1 -C "$GCC32_DIR"
@@ -65,12 +89,20 @@ if [ ! -d "$GCC64_DIR" ] || [ ! -d "$GCC32_DIR" ]; then
 fi
 
 if [ ! -d "$AK3_DIR" ]; then
-	printf "Cloning AnyKernel3 to %s...\n" "$AK3_DIR"
+	echo "Cloning AnyKernel3 to $AK3_DIR..."
 	git clone --depth=1 -b FSociety "$AK3_URL" "$AK3_DIR"
 fi
 
 KBUILD_COMPILER_STRING="$("$GCC64_DIR/bin/aarch64-elf-gcc" --version | head -n1)"
 PATH="$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
+
+CC="aarch64-elf-gcc"
+if command -v ccache &>/dev/null; then
+	export CCACHE_DIR="$WD/.ccache"
+	export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-2G}"
+	export CCACHE_BASEDIR="$WD"
+	CC="ccache $CC"
+fi
 
 export KBUILD_COMPILER_STRING PATH
 
@@ -84,7 +116,7 @@ MAKE=(
 	NM="aarch64-elf-nm"
 	OBJDUMP="aarch64-elf-objdump"
 	OBJCOPY="aarch64-elf-objcopy"
-	CC="aarch64-elf-gcc"
+	CC="$CC"
 	LLVM=0
 	LLVM_IAS=0
 )
@@ -92,49 +124,23 @@ MAKE=(
 if [[ ${1:-} == -r || ${1:-} == --regen ]]; then
 	"${MAKE[@]}" $DEFCONFIG savedefconfig
 	cp out/defconfig arch/arm64/configs/$DEFCONFIG
-	printf "\nSuccessfully regenerated defconfig at %s\n" $DEFCONFIG
+	echo -e "\nSuccessfully regenerated defconfig at $DEFCONFIG"
 	exit
 fi
 
 if [[ ${1:-} == -rf || ${1:-} == --regen-full ]]; then
 	"${MAKE[@]}" $DEFCONFIG
 	cp out/.config arch/arm64/configs/$DEFCONFIG
-	printf "\nSuccessfully regenerated full defconfig at %s\n" $DEFCONFIG
+	echo -e "\nSuccessfully regenerated full defconfig at $DEFCONFIG"
 	exit
 fi
 
-CLEAN="false"
-LTO="false"
-KSU="false"
-IMAGES_ONLY="false"
-
-for arg in "$@"; do
-	case $arg in
-	-c | --clean)
-		CLEAN="true"
-		;;
-	-l | --lto)
-		LTO="true"
-		;;
-	-s | --su)
-		KSU="true"
-		;;
-	-i | --images-only)
-		IMAGES_ONLY="true"
-		;;
-	*)
-		printf "Unknown argument: %s\n" "$arg"
-		exit 1
-		;;
-	esac
-done
-
 if [[ $CLEAN == "true" ]]; then
-	printf "Cleaning output directory...\n"
+	echo "Cleaning output directory..."
 	rm -rf out
 fi
 
-printf "Building surya defconfig...\n"
+echo "Building surya defconfig..."
 "${MAKE[@]}" $DEFCONFIG &>/dev/null
 
 if [[ $LTO == "true" ]]; then
@@ -143,7 +149,7 @@ if [[ $LTO == "true" ]]; then
 fi
 
 if [[ $KSU == "true" ]]; then
-	printf "Building KernelSU variant...\n"
+	echo "Building KernelSU variant..."
 	ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
 	scripts/config --file out/.config \
 		-e KSU \
@@ -153,10 +159,9 @@ if [[ $KSU == "true" ]]; then
 	"${MAKE[@]}" olddefconfig &>/dev/null
 fi
 
-printf "\n"
+echo
 SECONDS=0
 "${MAKE[@]}" -j"$(nproc --all)" 2> >(tee log.txt >&2)
-"${MAKE[@]}" headers_install &>/dev/null
 BUILD_TIME=$SECONDS
 
 kernel="out/arch/arm64/boot/Image.gz"
@@ -165,22 +170,15 @@ dtbo="out/arch/arm64/boot/dtbo.img"
 dtbo_miui="out/arch/arm64/boot/dtbo-miui.img"
 
 if [ ! -f "$kernel" ] || [ ! -f "$dtb" ] || [ ! -f "$dtbo" ] || [ ! -f "$dtbo_miui" ]; then
-	printf "\nMissing build artifacts, aborting.\n"
+	echo -e "\nMissing build artifacts, aborting."
 	exit 1
 fi
 
-if [[ $IMAGES_ONLY == "true" ]]; then
-	printf "\nImages compiled successfully!\n"
-	printf "\nCompleted in %d minute(s) and %d second(s)!\n" $((BUILD_TIME / 60)) $((BUILD_TIME % 60))
-	printf "Images: %s\n" "$kernel $dtb $dtbo $dtbo_miui"
-	exit 0
-fi
-
-printf "\nKernel compiled successfully! Zipping up...\n"
+echo -e "\nKernel compiled successfully! Zipping up..."
 cp "$kernel" "$dtb" "$dtbo" "$dtbo_miui" "$AK3_DIR"
 cd "$AK3_DIR"
-zip -r9 "../$ZIPNAME" ./* -x .git modules\* patch\* ramdisk\* README.md \*placeholder &>/dev/null
-rm -f Image.gz-dtb dtbo.img dtbo-miui.img
+zip -r1 "../$ZIPNAME" ./* -x .git modules\* patch\* ramdisk\* README.md \*placeholder &>/dev/null
+rm -f Image.gz dtb.img dtbo.img dtbo-miui.img
 cd ..
-printf "\nCompleted in %d minute(s) and %d second(s)!\n" $((BUILD_TIME / 60)) $((BUILD_TIME % 60))
-printf "Zip: %s\n" "$ZIPNAME"
+echo -e "\nCompleted in $((BUILD_TIME / 60)) minute(s) and $((BUILD_TIME % 60)) second(s)!"
+echo "Zip: $ZIPNAME"
