@@ -778,6 +778,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 				  15, 15),
 	},
 #endif
+#ifdef CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY
 	{
 		.desc = "Spectre-BHB",
 		.capability = ARM64_SPECTRE_BHB,
@@ -785,6 +786,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.matches = is_spectre_bhb_affected,
 		.cpu_enable = spectre_bhb_enable_mitigation,
 	},
+#endif
 #ifdef CONFIG_ARM64_ERRATUM_1742098
 	{
 		.desc = "ARM erratum 1742098",
