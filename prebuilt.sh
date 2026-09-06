@@ -5,7 +5,20 @@
 
 set -euo pipefail
 
-trap 'printf "\nInterrupted.\n"; exit 1' INT
+trap 'echo -e "\nInterrupted."; exit 1' INT
+
+RELEASE="false"
+for arg in "$@"; do
+	case $arg in
+	-r | --release)
+		RELEASE="true"
+		;;
+	*)
+		echo "Unknown argument: $arg"
+		exit 1
+		;;
+	esac
+done
 
 REMOTE="git@github.com:rd-stuffs/device_xiaomi_surya-kernel.git"
 TAG=$(date '+%d%m%Y')
@@ -16,27 +29,20 @@ dtb="out/arch/arm64/boot/dts/qcom/sdmmagpie.dtb"
 dtbo="out/arch/arm64/boot/dtbo.img"
 
 if [ ! -f "$kernel" ] || [ ! -f "$dtb" ] || [ ! -f "$dtbo" ]; then
-	printf "Missing build artifacts, run build.sh first.\n"
+	echo "Missing build artifacts, run build.sh first."
 	exit 1
 fi
 
-if [ ! -d out/usr ]; then
-	printf "Missing kernel headers, run build.sh first.\n"
-	exit 1
+if [ ! -d out/usr/include ]; then
+	echo "Installing kernel headers..."
+	PATH="$WD/tc/gcc-arm64/bin:$WD/tc/gcc-arm/bin:$PATH" \
+	make ARCH=arm64 O=out CROSS_COMPILE="aarch64-elf-" headers_install &>/dev/null
 fi
 
-RELEASE="false"
-for arg in "$@"; do
-	case $arg in
-	-r | --release)
-		RELEASE="true"
-		;;
-	*)
-		printf "Unknown argument: %s\n" "$arg"
-		exit 1
-		;;
-	esac
-done
+if [ ! -d out/usr/include ]; then
+	echo "Missing kernel headers, run build.sh first."
+	exit 1
+fi
 
 rm -rf out/prebuilt
 mkdir -p out/prebuilt/kernel-headers/usr
@@ -85,4 +91,5 @@ else
 	git -C out/prebuilt push -qf "$REMOTE" staging
 fi
 
-printf "%s\nPrebuilt artifacts exported successfully.\n" "$INFO"
+echo "$INFO"
+echo "Prebuilt artifacts exported successfully."
