@@ -2,64 +2,103 @@ name: Build Kernel
 
 on:
   push:
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: America/Sao_Paulo
+  KBUILD_BUILD_USER: nobody
+  KBUILD_BUILD_HOST: android-build
+  CCACHE_DIR: .ccache
+  CCACHE_MAXSIZE: 5G
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      TZ: America/Sao_Paulo
-      KBUILD_BUILD_USER: nobody
-      KBUILD_BUILD_HOST: android-build
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: standard
+            flags: --lto -u
+            artifact: standard-zip
+            prebuilt: true
+          - name: ksu
+            flags: --lto --su -u
+            artifact: ksu-zip
+            prebuilt: false
     steps:
       - name: Checkout
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
 
-      - name: Configure git
+      - name: Cache toolchain and ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            tc
+            .ccache
+          key: kernel-${{ matrix.name }}-${{ runner.os }}-${{ hashFiles('build.py') }}-${{ github.sha }}
+          restore-keys: |
+            kernel-${{ matrix.name }}-${{ runner.os }}-${{ hashFiles('build.py') }}-
+            kernel-${{ matrix.name }}-${{ runner.os }}-
+            kernel-standard-${{ runner.os }}-
+
+      - name: Build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          ./build.py ${{ matrix.flags }}
+          ccache -s
+
+      - name: Export prebuilts
+        if: matrix.prebuilt && github.ref == 'refs/heads/main'
+        env:
+          PREBUILT_SSH_KEY: ${{ secrets.PREBUILT_SSH_KEY }}
         run: |
           git config --global user.name "Richard Raya"
           git config --global user.email "rdxzv.dev@gmail.com"
-
-      - name: Setup commit-msg hook
-        run: |
-          mkdir -p ~/.git/hooks
-          git config --global core.hooksPath ~/.git/hooks
-          curl -fsSL https://gist.githubusercontent.com/UtsavBalar1231/c48cb6993ff45b077d41c13622fc27ba/raw/66f7da7f128a9511df81d624f23f87fc294b59b6/commit-msg \
-            -o ~/.git/hooks/commit-msg
-          chmod +x ~/.git/hooks/commit-msg
-
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PREBUILT_SSH_KEY }}" > ~/.ssh/id_rsa
+          mkdir -p ~/.ssh ~/.git/hooks
+          echo "${PREBUILT_SSH_KEY}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git config --global core.hooksPath ~/.git/hooks
+          curl -fsSL https://gist.githubusercontent.com/UtsavBalar1231/c48cb6993ff45b077d41c13622fc27ba/raw/66f7da7f128a9511df81d624f23f87fc294b59b6/commit-msg -o ~/.git/hooks/commit-msg
+          chmod +x ~/.git/hooks/commit-msg
+          ./build.py --prebuilt
 
-      - name: Build
-        run: |
-          bash build.sh --lto
-          bash build.sh --lto --su
-
-      - name: Export prebuilts
-        run: bash prebuilt.sh
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@main
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: kernel-zips
-          path: "*.zip"
+          name: ${{ matrix.artifact }}
+          path: FSociety-*.zip
+
+  notify:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-zip"
+          merge-multiple: true
 
       - name: Send to Telegram
         run: |
+          STANDARD_ZIP=$(echo FSociety-surya-*.zip)
+          KSU_ZIP=$(echo FSociety-KSU-*.zip)
           DATE=$(date '+%H:%M %d/%m/%Y')
-          COMMIT="https://github.com/${{ github.repository }}/commit/$(git rev-parse HEAD)"
-          STANDARD=$(ls FSociety-surya-*.zip)
-          KSU=$(ls FSociety-KSU-*.zip)
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F document=@"${STANDARD}" \
+          COMMIT="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TELEGRAM_CHAT_ID}" \
+            -F document=@"${STANDARD_ZIP}" \
             -F caption="${DATE}"$'\n\n'"${COMMIT}"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F document=@"${KSU}"
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TELEGRAM_CHAT_ID}" \
+            -F document=@"${KSU_ZIP}"
