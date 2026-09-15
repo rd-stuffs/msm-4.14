@@ -276,6 +276,9 @@ int free_swap_slot(swp_entry_t entry)
 	struct swap_info_struct *si;
 
 	si = swp_swap_info(entry);
+	if (unlikely(!si))
+		return 0;
+
 	cache = raw_cpu_ptr(&swp_slots);
 	if (!(si->flags & SWP_SYNCHRONOUS_IO) &&
 				use_swap_slot_cache && cache->slots_ret) {
