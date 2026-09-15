@@ -2792,6 +2792,12 @@ int do_swap_page(struct vm_fault *vmf)
 	 * and can then take the readahead path instead of SWP_SYNCHRONOUS_IO.
 	 */
 	si = swp_swap_info(entry);
+	if (unlikely(!si)) {
+		print_bad_pte(vma, vmf->address, vmf->orig_pte, NULL);
+		ret = VM_FAULT_SIGBUS;
+		delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
+		goto out;
+	}
 	if (si->flags & SWP_SYNCHRONOUS_IO && __swap_count(si, entry) == 1)
 		skip_swapcache = true;
 
