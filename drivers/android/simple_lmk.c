@@ -267,9 +267,6 @@ static void scan_and_kill(void)
 			vtsk->signal->oom_score_adj,
 			victim->size << (PAGE_SHIFT - 10));
 
-		/* Make the victim reap anonymous memory first in exit_mmap() */
-		set_bit(MMF_OOM_VICTIM, &mm->flags);
-
 		/* Accelerate the victim's death by forcing the kill signal */
 		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, vtsk, true);
 
@@ -373,13 +370,11 @@ static struct mm_struct *next_reap_victim(void)
 		}
 
 		/*
-		 * Check MMF_OOM_SKIP again under the lock in case this mm was
-		 * reaped by exit_mmap() and then had its page tables destroyed.
-		 * No mmgrab() is needed because the reclaim thread sets
-		 * MMF_OOM_VICTIM under task_lock() for the mm's task, which
-		 * guarantees that MMF_OOM_VICTIM is always set before the
-		 * victim mm can enter exit_mmap(). Therefore, an mmap read lock
-		 * is sufficient to keep the mm struct itself from being freed.
+		 * Check MMF_OOM_SKIP again under the lock in case this mm entered
+		 * exit_mmap() and had its page tables destroyed. No mmgrab() is
+		 * needed because exit_mmap() acquires mmap_sem for write before
+		 * tearing down the mm. Therefore, an mmap read lock is sufficient
+		 * to keep the mm struct itself from being freed while reaping.
 		 */
 		if (!test_bit(MMF_OOM_SKIP, &mm->flags))
 			break;
@@ -415,11 +410,9 @@ static void reap_victims(void)
 		}
 
 		/*
-		 * Reap the victim, then unflag the mm for exit_mmap() reaping
-		 * and mark it as reaped with MMF_OOM_SKIP.
+		 * Reap the victim, then mark it as reaped with MMF_OOM_SKIP.
 		 */
 		__oom_reap_task_mm(mm);
-		clear_bit(MMF_OOM_VICTIM, &mm->flags);
 		set_bit(MMF_OOM_SKIP, &mm->flags);
 		up_read(&mm->mmap_sem);
 	}

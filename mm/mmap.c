@@ -3044,6 +3044,7 @@ void exit_mmap(struct mm_struct *mm)
 	/* mm's last user has gone, and its about to be pulled down */
 	mmu_notifier_release(mm);
 
+#ifndef CONFIG_ANDROID_SIMPLE_LMK
 	if (unlikely(mm_is_oom_victim(mm))) {
 		/*
 		 * Manually reap the mm to free as much memory as possible.
@@ -3065,8 +3066,12 @@ void exit_mmap(struct mm_struct *mm)
 
 		set_bit(MMF_OOM_SKIP, &mm->flags);
 	}
+#endif
 
 	down_write(&mm->mmap_sem);
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	set_bit(MMF_OOM_SKIP, &mm->flags);
+#endif
 	if (mm->locked_vm) {
 		vma = mm->mmap;
 		while (vma) {
