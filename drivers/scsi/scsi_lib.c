@@ -349,8 +349,14 @@ static void scsi_dec_host_busy(struct Scsi_Host *shost)
 void scsi_device_unbusy(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
-	struct scsi_target *starget = scsi_target(sdev);
+	struct scsi_target *starget;
 
+	if (unlikely(!sdev->sdev_gendev.parent)) {
+		atomic_dec(&sdev->device_busy);
+		return;
+	}
+
+	starget = scsi_target(sdev);
 	scsi_dec_host_busy(shost);
 
 	if (starget->can_queue > 0)
@@ -378,8 +384,13 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
 	struct Scsi_Host *shost = current_sdev->host;
 	struct scsi_device *sdev, *tmp;
-	struct scsi_target *starget = scsi_target(current_sdev);
+	struct scsi_target *starget;
 	unsigned long flags;
+
+	if (!current_sdev->sdev_gendev.parent)
+		return;
+
+	starget = scsi_target(current_sdev);
 
 	spin_lock_irqsave(shost->host_lock, flags);
 	starget->starget_sdev_user = NULL;
@@ -518,7 +529,14 @@ static void scsi_starved_list_run(struct Scsi_Host *shost)
  */
 static void scsi_run_queue(struct request_queue *q)
 {
-	struct scsi_device *sdev = q->queuedata;
+	struct scsi_device *sdev;
+
+	if (!q)
+		return;
+
+	sdev = q->queuedata;
+	if (!sdev || !scsi_device_online(sdev) || !sdev->sdev_gendev.parent)
+		return;
 
 	if (scsi_target(sdev)->single_lun)
 		scsi_single_lun_run(sdev);
@@ -581,8 +599,10 @@ void scsi_run_host_queues(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
 
-	shost_for_each_device(sdev, shost)
-		scsi_run_queue(sdev->request_queue);
+	shost_for_each_device(sdev, shost) {
+		if (scsi_device_online(sdev))
+			scsi_run_queue(sdev->request_queue);
+	}
 }
 
 static void scsi_uninit_cmd(struct scsi_cmnd *cmd)
