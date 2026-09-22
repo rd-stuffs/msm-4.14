@@ -154,7 +154,7 @@ done:
 static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt)
 {
 	/* Initialize @best such that @best always has a valid CPU at the end */
-	struct cass_cpu_cand cands[2], *best = cands;
+	struct cass_cpu_cand cands[2], *best = NULL;
 	int this_cpu = raw_smp_processor_id();
 	unsigned long p_util;
 	bool has_idle = false;
@@ -256,15 +256,26 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 
 		/*
 		 * Check if this CPU is better than the best CPU found so far.
-		 * If @best == @curr then there's no need to compare them, but
-		 * cidx still needs to be changed to the other candidate slot.
+		 * If @best is NULL or @best == @curr then there's no need to
+		 * compare them, but cidx still needs to be changed to the other
+		 * candidate slot.
 		 */
-		if (best == curr ||
+		if (!best || best == curr ||
 		    cass_cpu_better(curr, best, p_util, this_cpu, prev_cpu,
 				    sync)) {
 			best = curr;
 			cidx ^= 1;
 		}
+	}
+
+	/*
+	 * Guard against an empty candidate evaluation loop by providing a safe
+	 * fallback instead of returning uninitialized stack garbage.
+	 */
+	if (unlikely(!best)) {
+		return cpumask_test_cpu(prev_cpu, p->cpus_ptr) &&
+		       cpumask_test_cpu(prev_cpu, cpu_active_mask) ?
+		       prev_cpu : cpumask_first_and(p->cpus_ptr, cpu_active_mask);
 	}
 
 	return best->cpu;
