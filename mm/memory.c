@@ -651,7 +651,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
 	if (is_zero_pfn(pfn))
 		return NULL;
 check_pfn:
-	if (unlikely(pfn > highest_memmap_pfn || !pfn_valid(pfn))) {
+	if (unlikely(pfn > highest_memmap_pfn)) {
 		print_bad_pte(vma, addr, pte, NULL);
 		return NULL;
 	}
@@ -692,7 +692,7 @@ struct page *vm_normal_page_pmd(struct vm_area_struct *vma, unsigned long addr,
 
 	if (is_zero_pfn(pfn))
 		return NULL;
-	if (unlikely(pfn > highest_memmap_pfn || !pfn_valid(pfn)))
+	if (unlikely(pfn > highest_memmap_pfn))
 		return NULL;
 
 	/*
