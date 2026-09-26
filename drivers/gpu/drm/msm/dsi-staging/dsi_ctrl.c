@@ -2440,7 +2440,7 @@ static void dsi_ctrl_handle_error_status(struct dsi_ctrl *dsi_ctrl,
 						cb_info.event_idx,
 						dsi_ctrl->cell_index,
 						0, 0, 0, 0);
-			pr_err("dsi FIFO OVERFLOW error: 0x%lx\n", error);
+			pr_err_ratelimited("dsi FIFO OVERFLOW error: 0x%lx\n", error);
 		}
 	}
 
@@ -2453,16 +2453,16 @@ static void dsi_ctrl_handle_error_status(struct dsi_ctrl *dsi_ctrl,
 						dsi_ctrl->cell_index,
 						0, 0, 0, 0);
 		}
-		pr_err("dsi FIFO UNDERFLOW error: 0x%lx\n", error);
+		pr_err_ratelimited("dsi FIFO UNDERFLOW error: 0x%lx\n", error);
 	}
 
 	/* DSI PLL UNLOCK error */
 	if (error & BIT(8))
-		pr_err("dsi PLL unlock error: 0x%lx\n", error);
+		pr_err_ratelimited("dsi PLL unlock error: 0x%lx\n", error);
 
 	/* ACK error */
 	if (error & 0xF)
-		pr_err("ack error: 0x%lx\n", error);
+		pr_err_ratelimited("ack error: 0x%lx\n", error);
 
 	/*
 	 * DSI Phy can go into bad state during ESD influence. This can
