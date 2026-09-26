@@ -77,7 +77,12 @@ KEEP_SYMBOL long ksu_do_faccessat(int dfd, const char __user *filename, int mode
 #endif // 5.7+ || faccessat2
 
 // vfs_statx, vfs_fstatat
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0) // on most kernels vfs_fstatat calls gets inlined, so look for vfs_statx instead
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0) || defined(KSU_HAS_VFS_STATX2)
+/**
+ * on 6.1 kernels vfs_fstatat calls can get inlined, so we have to also look for vfs_statx
+ * actually overloading on do_statx is possible instead of this ifdef, see torvalds/linux 1b6fe6e0dfe
+ * but we already scan for something like faccessat2 so nbd for now.
+ */
 DEFINE_ASM_STUB(ksu_vfs_statx_fn);
 KEEP_SYMBOL int ksu_vfs_statx_fn(int dfd, struct filename *filename, int flags, struct kstat *stat, u32 request_mask);
 KEEP_SYMBOL int ksu_vfs_statx(int dfd, struct filename *restrict filename, int flags, struct kstat *restrict stat, u32 request_mask)
@@ -91,9 +96,15 @@ KEEP_SYMBOL int ksu_vfs_statx(int dfd, struct filename *restrict filename, int f
 
 	// see sucompat.c
 	const char su[16] = SU_PATH;
+#if 0
+	uint128_t *su128 = (uint128_t *)su;
+	uint128_t *fn128 = (uint128_t *)*(char **)filename_ptr;
+	const uint128_t mask = make128const(0x00FFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL);
+	if (likely((*fn128 & mask) != (*su128 & mask)))
+		return;
+#endif
 	uint64_t *su_p = (uint64_t *)su;
 	uint64_t *fn_p = (uint64_t *)filename_ptr;
-
 	if (likely((fn_p[1] & 0x00FFFFFFFFFFFFFFULL) != (su_p[1] & 0x00FFFFFFFFFFFFFFULL)))
 		goto orig_fn;
 
@@ -102,7 +113,8 @@ KEEP_SYMBOL int ksu_vfs_statx(int dfd, struct filename *restrict filename, int f
 
 	write_sulog('s');
 	pr_info("su_compat: vfs_statx su->sh!%s\n", (is_compat_task()) ? " [compat]" : "" );
-	__builtin_memcpy(filename_ptr, SH_PATH, sizeof(SH_PATH));
+	const char sh[16] = SH_PATH;
+	memcpy_inline(filename_ptr, sh, sizeof(sh));
 
 orig_fn:
 	return ksu_vfs_statx_fn(dfd, filename, flags, stat, request_mask);

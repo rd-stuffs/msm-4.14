@@ -8,7 +8,7 @@ struct uid_data {
 	char package[KSU_MAX_PACKAGE_NAME];
 };
 
-static __always_inline void crown_manager(const char *apk, struct list_head *uid_data)
+static void crown_manager(const char *apk, struct list_head *uid_data)
 {
 	char pkg[KSU_MAX_PACKAGE_NAME];
 	if (get_pkg_from_apk_path(pkg, apk) < 0) {
@@ -76,7 +76,6 @@ FILLDIR_RETURN_TYPE my_actor(MY_ACTOR_CTX_ARG, const char *name,
 			     unsigned int d_type)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
-	// then pull it out of the void
 	struct dir_context *ctx = (struct dir_context *)ctx_void;
 #endif
 	struct my_dir_context *my_ctx =
@@ -125,7 +124,7 @@ FILLDIR_RETURN_TYPE my_actor(MY_ACTOR_CTX_ARG, const char *name,
 	}
 
 	// now put this on candidate_path
-	if (d_type == DT_REG && namelen == 8 && !memcmp(name, "base.apk", 8)) {
+	if (d_type == DT_REG && namelen == 8 && !memcmp_inline(name, "base.apk", 8)) {
 		snprintf(candidate_path, DATA_PATH_LEN, "%s/%.*s", my_ctx->parent_dir, namelen, name);
 	}
 
@@ -147,8 +146,6 @@ static noinline void search_manager(const char *path, int depth, struct list_hea
 	unsigned long data_app_magic = 0;
 
 	char *memory __offstack(sizeof(struct data_path) + DATA_PATH_LEN);
-	if (!memory)
-		return;
 
 	// First depth
 	struct data_path *data = (struct data_path *)memory;
@@ -171,12 +168,12 @@ static noinline void search_manager(const char *path, int depth, struct list_hea
 						      .stop = &stop };
 
 			// destroy buffer on every iteration
-			candidate_path[0] = '\0';
+			candidate_path[0] = 0;
 
 			if (stop)
 				goto skip_iterate;
 
-			struct file *file = filp_open(pos->dirpath, O_RDONLY | O_NOFOLLOW | O_DIRECTORY, 0);
+			struct file *file = file = ksu_filp_open_nonotify(pos->dirpath, O_RDONLY | O_NOFOLLOW | O_NOATIME | O_DIRECTORY);
 			if (IS_ERR(file)) {
 				pr_err("Failed to open directory: %s, err: %ld\n", pos->dirpath, PTR_ERR(file));
 				goto skip_iterate;
@@ -336,7 +333,7 @@ out:
 	list_for_each_entry_safe (np, n, &uid_list, list) {
 		list_del(&np->list);
 		kfree(np);
-	}
+	}	
 }
 
 static DEFINE_MUTEX(throne_tracker_mutex);
@@ -348,7 +345,7 @@ static int throne_tracker_thread(void *data)
 
 	pr_info("throne_tracker: pid: %d started\n", current->pid);
 
-	mutex_lock(&throne_tracker_mutex);
+	guarded_mutex_lock(&throne_tracker_mutex);
 
 test_tmp:
 	if (!is_file_existing("/data/system/packages.list.tmp"))
@@ -374,10 +371,9 @@ start_tt:
 	// lessen that window where user opens manager right away, yet its not crowned
 	set_user_nice(current, -10);
 
+	// this in exchange of override creds, we escape this whole thread.
 	escape_to_root_forced();
 	throne_tracker_fn(prune_only);
-
-	mutex_unlock(&throne_tracker_mutex);
 
 	pr_info("throne_tracker: pid: %d exit!\n", current->pid);
 	return 0;
@@ -386,16 +382,17 @@ start_tt:
 void track_throne(bool prune_only)
 {
 #ifndef CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED
-	static bool throne_tracker_first_run __read_mostly = true;
-	if (unlikely(throne_tracker_first_run)) {
-		mutex_lock(&throne_tracker_mutex);
-		throne_tracker_fn(prune_only);
-		mutex_unlock(&throne_tracker_mutex);
-		throne_tracker_first_run = false;
-		return;
-	}
-#endif
+	static void *label = &&first_run;
+	goto *label;
 
+first_run:
+	if (guarded_mutex_lock(&throne_tracker_mutex))
+		throne_tracker_fn(prune_only);
+	
+	label = &&threaded;
+	return;
+threaded:
+#endif
 	// HACK: force cast prune_only to be a void *
 	kthread_run(throne_tracker_thread, (void *)prune_only, "kthread");
 }
