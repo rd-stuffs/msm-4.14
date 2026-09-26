@@ -4,6 +4,8 @@
 
 #include <linux/radix-tree.h>
 #include <linux/bug.h>
+#include <linux/mmzone.h>
+
 
 /*
  * swapcache pages are stored in the swapper_space radix tree.  We want to
@@ -190,8 +192,11 @@ static inline swp_entry_t make_migration_entry(struct page *page, int write)
 
 static inline int is_migration_entry(swp_entry_t entry)
 {
-	return unlikely(swp_type(entry) == SWP_MIGRATION_READ ||
-			swp_type(entry) == SWP_MIGRATION_WRITE);
+	if (likely(swp_type(entry) != SWP_MIGRATION_READ &&
+		   swp_type(entry) != SWP_MIGRATION_WRITE))
+		return 0;
+
+	return pfn_valid(swp_offset(entry));
 }
 
 static inline int is_write_migration_entry(swp_entry_t entry)
