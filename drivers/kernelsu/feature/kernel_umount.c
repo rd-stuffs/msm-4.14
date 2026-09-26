@@ -1,10 +1,4 @@
 static bool ksu_kernel_umount_enabled __read_mostly = true;
-static bool ksu_webview_zygote_umount_enabled = true;
-
-bool ksu_is_webview_zygote_umount_enabled(void)
-{
-	return READ_ONCE(ksu_webview_zygote_umount_enabled);
-}
 
 static int kernel_umount_feature_get(u64 *value)
 {
@@ -27,27 +21,7 @@ static const struct ksu_feature_handler kernel_umount_handler = {
 	.set_handler = kernel_umount_feature_set,
 };
 
-static int webview_zygote_umount_feature_get(u64 *value)
-{
-	*value = ksu_is_webview_zygote_umount_enabled() ? 1 : 0;
-	return 0;
-}
-
-static int webview_zygote_umount_feature_set(u64 value)
-{
-	bool enable = value != 0;
-	WRITE_ONCE(ksu_webview_zygote_umount_enabled, enable);
-	pr_info("webview_zygote_umount: set to %d\n", enable);
-	return 0;
-}
-
-static const struct ksu_feature_handler webview_zygote_umount_handler = {
-	.feature_id = KSU_FEATURE_WEBVIEW_ZYGOTE_UMOUNT,
-	.name = "webview_zygote_umount",
-	.get_handler = webview_zygote_umount_feature_get,
-	.set_handler = webview_zygote_umount_feature_set,
-};
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
 extern int path_umount(struct path *path, int flags);
 
 static inline void ksu_umount_mnt(const char *mnt, struct path *path, int flags)
@@ -56,6 +30,31 @@ static inline void ksu_umount_mnt(const char *mnt, struct path *path, int flags)
 	if (err)
 		pr_info("umount %s failed: %d\n", mnt, err);
 }
+#else /* we play 'guess if backported' */
+static __nocfi inline void ksu_umount_mnt(const char *mnt, struct path *path, int flags)
+{
+	extern int path_umount(struct path *path, int flags) __weak;
+	int err;
+#ifdef MODULE
+	assume(!path_umount);
+#endif
+	if (!path_umount)
+		goto syscall;
+
+	err = path_umount(path, flags);
+	goto out;
+
+syscall:;
+	mm_segment_t old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = (int)ksyscall(umount, (const char __user *)mnt, flags);
+	set_fs(old_fs);
+	path_put(path);  // release caller's ref
+out:
+	if (err)
+		pr_info("umount %s failed: %d\n", mnt, err);
+}
+#endif
 
 static inline void try_umount(const char *mnt, int flags)
 {
@@ -90,7 +89,7 @@ static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
 	// 1. Normal app: zygote -> appuid
 	// 2. Isolated process forked from zygote: zygote -> isolated_process
 	// 3. App zygote forked from zygote: zygote -> appuid
-	// 4. Webview zygote forked from zygote: zygote -> webview_zygote (controlled by feature policy)
+	// 4. Webview zygote forked from zygote: zygote -> webview_zygote
 	// 5. Isolated process forked from app zygote: appuid -> isolated_process (already handled by 3)
 	// 6. Isolated process forked from webview zygote (already handled by 4)
 	if (!is_appuid(new_uid) && new_uid != WEBVIEW_ZYGOTE_UID && !is_isolated_process(new_uid))
@@ -109,8 +108,9 @@ static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
 		return 0;
 	}
 
+#ifdef CONFIG_KSU_HOSTSREDIRECT
 	set_thread_flag(TIF_KSU_UNMOUNTABLE);
-
+#endif
 	// umount the target mnt
 	pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
 
@@ -134,13 +134,9 @@ void __init ksu_kernel_umount_init(void)
 	if (ksu_register_feature_handler(&kernel_umount_handler)) {
 		pr_err("Failed to register kernel_umount feature handler\n");
 	}
-	if (ksu_register_feature_handler(&webview_zygote_umount_handler)) {
-		pr_err("Failed to register webview_zygote_umount feature handler\n");
-	}
 }
 
 void __exit ksu_kernel_umount_exit(void)
 {
-	ksu_unregister_feature_handler(KSU_FEATURE_WEBVIEW_ZYGOTE_UMOUNT);
 	ksu_unregister_feature_handler(KSU_FEATURE_KERNEL_UMOUNT);
 }
