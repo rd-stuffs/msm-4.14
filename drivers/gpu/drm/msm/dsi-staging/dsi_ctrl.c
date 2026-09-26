@@ -2427,14 +2427,18 @@ static void dsi_ctrl_handle_error_status(struct dsi_ctrl *dsi_ctrl,
 		pr_err("tx timeout error: 0x%lx\n", error);
 	}
 
-	/* DSI FIFO OVERFLOW error */
-	if (error & 0xF0000) {
+	/* DSI FIFO OVERFLOW and UNDERFLOW errors */
+	if (error & 0xFF0000) {
 		u32 mask = 0;
 
 		if (dsi_ctrl->hw.ops.get_error_mask)
 			mask = dsi_ctrl->hw.ops.get_error_mask(&dsi_ctrl->hw);
+
 		/* no need to report FIFO overflow if already masked */
-		if (cb_info.event_cb && !(mask & 0xf0000)) {
+		if ((error & 0xF0000) && cb_info.event_cb && !(mask & 0xf0000)) {
+			if (dsi_ctrl->hw.ops.mask_error_intr)
+				dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
+					BIT(DSI_FIFO_OVERFLOW), true);
 			cb_info.event_idx = DSI_FIFO_OVERFLOW;
 			(void)cb_info.event_cb(cb_info.event_usr_ptr,
 						cb_info.event_idx,
@@ -2442,18 +2446,20 @@ static void dsi_ctrl_handle_error_status(struct dsi_ctrl *dsi_ctrl,
 						0, 0, 0, 0);
 			pr_err_ratelimited("dsi FIFO OVERFLOW error: 0x%lx\n", error);
 		}
-	}
 
-	/* DSI FIFO UNDERFLOW error */
-	if (error & 0xF00000) {
-		if (cb_info.event_cb) {
+		/* no need to report FIFO underflow if already masked */
+		if ((error & 0xF00000) && cb_info.event_cb &&
+		    !(mask & (0x1b << 26))) {
+			if (dsi_ctrl->hw.ops.mask_error_intr)
+				dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
+					BIT(DSI_FIFO_UNDERFLOW), true);
 			cb_info.event_idx = DSI_FIFO_UNDERFLOW;
 			(void)cb_info.event_cb(cb_info.event_usr_ptr,
 						cb_info.event_idx,
 						dsi_ctrl->cell_index,
 						0, 0, 0, 0);
+			pr_err_ratelimited("dsi FIFO UNDERFLOW error: 0x%lx\n", error);
 		}
-		pr_err_ratelimited("dsi FIFO UNDERFLOW error: 0x%lx\n", error);
 	}
 
 	/* DSI PLL UNLOCK error */

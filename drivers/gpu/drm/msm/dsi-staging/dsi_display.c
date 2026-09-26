@@ -4389,6 +4389,7 @@ static int dsi_display_dfps_update(struct dsi_display *display,
 	struct dsi_dyn_clk_caps *dyn_clk_caps;
 	int rc = 0;
 	int i = 0;
+	u32 mask = 0;
 
 	if (!display || !dsi_mode || !display->panel) {
 		pr_err("Invalid params\n");
@@ -4412,6 +4413,9 @@ static int dsi_display_dfps_update(struct dsi_display *display,
 
 	pr_debug("configuring seamless dynamic fps\n\n");
 	SDE_EVT32(SDE_EVTLOG_FUNC_ENTRY);
+
+	mask = BIT(DSI_FIFO_OVERFLOW) | BIT(DSI_FIFO_UNDERFLOW);
+	dsi_display_mask_ctrl_error_interrupts(display, mask, true);
 
 	m_ctrl = &display->ctrl[display->clk_master_idx];
 	rc = dsi_ctrl_async_timing_update(m_ctrl->ctrl, timing);
@@ -4446,6 +4450,8 @@ static int dsi_display_dfps_update(struct dsi_display *display,
 	panel_mode->dsi_mode_flags = 0;
 
 error:
+	if (mask)
+		dsi_display_mask_ctrl_error_interrupts(display, mask, false);
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT);
 	return rc;
 }
@@ -7039,6 +7045,8 @@ static void dsi_display_handle_fifo_underflow(struct work_struct *work)
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
 			DSI_ALL_CLKS, DSI_CLK_ON);
 	dsi_display_soft_reset(display);
+	dsi_display_mask_ctrl_error_interrupts(display,
+			BIT(DSI_FIFO_UNDERFLOW), false);
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
 			DSI_ALL_CLKS, DSI_CLK_OFF);
 
@@ -7117,6 +7125,8 @@ static void dsi_display_handle_fifo_overflow(struct work_struct *work)
 	 */
 	usleep_range(180, 220);
 end:
+	dsi_display_mask_ctrl_error_interrupts(display,
+			BIT(DSI_FIFO_OVERFLOW), false);
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
 			DSI_ALL_CLKS, DSI_CLK_OFF);
 	mutex_unlock(&display->display_lock);
