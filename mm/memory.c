@@ -1160,10 +1160,16 @@ again:
 			struct page *page;
 
 			page = migration_entry_to_page(entry);
-			if (details && details->check_mapping &&
-			    details->check_mapping != page_rmapping(page))
-				continue;
-			rss[mm_counter(page)]--;
+			if (unlikely(!page)) {
+				print_bad_pte(vma, addr, ptent, NULL);
+			} else {
+				if (details && details->check_mapping &&
+				    details->check_mapping != page_rmapping(page))
+					continue;
+				rss[mm_counter(page)]--;
+			}
+		} else if (!is_hwpoison_entry(entry)) {
+			print_bad_pte(vma, addr, ptent, NULL);
 		}
 		if (unlikely(!free_swap_and_cache(entry)))
 			print_bad_pte(vma, addr, ptent, NULL);
