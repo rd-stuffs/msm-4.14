@@ -42,11 +42,9 @@ jobs:
           path: |
             tc
             .ccache
-          key: kernel-${{ matrix.name }}-${{ runner.os }}-${{ hashFiles('build.py') }}-${{ github.sha }}
+          key: kernel-${{ matrix.name }}-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
-            kernel-${{ matrix.name }}-${{ runner.os }}-${{ hashFiles('build.py') }}-
             kernel-${{ matrix.name }}-${{ runner.os }}-
-            kernel-standard-${{ runner.os }}-
 
       - name: Build
         env:
