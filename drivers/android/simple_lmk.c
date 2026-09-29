@@ -5,6 +5,7 @@
 
 #define pr_fmt(fmt) "simple_lmk: " fmt
 
+#include <linux/cred.h>
 #include <linux/delay.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
@@ -27,6 +28,36 @@
 /* Timeout in jiffies for each reclaim */
 #define RECLAIM_EXPIRES msecs_to_jiffies(CONFIG_ANDROID_SIMPLE_LMK_TIMEOUT_MSEC)
 
+/* Android application UID boundary */
+#define AID_USER_OFFSET 100000
+#define AID_APP_START 10000
+
+/* Lowest OOM score assigned to persistent applications by Android framework */
+#define PERSISTENT_PROC_ADJ (-800)
+
+/* Memory pressure thresholds from mm/vmpressure.c */
+#define VMPRESSURE_MEDIUM 60
+#define VMPRESSURE_CRITICAL 95
+
+/* Reclaim modes */
+enum {
+	RECLAIM_NONE = 0,
+	RECLAIM_UNMANAGED,
+	RECLAIM_ALL
+};
+
+static inline bool task_is_app(struct task_struct *tsk)
+{
+	uid_t uid = from_kuid(&init_user_ns, task_uid(tsk));
+
+	return (uid % AID_USER_OFFSET) >= AID_APP_START;
+}
+
+static inline bool task_is_unmanaged(struct task_struct *tsk, short adj)
+{
+	return task_is_app(tsk) && adj < PERSISTENT_PROC_ADJ;
+}
+
 struct victim_info {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
@@ -41,7 +72,7 @@ static DECLARE_COMPLETION(reclaim_done);
 static __cacheline_aligned_in_smp DEFINE_RWLOCK(mm_free_lock);
 static int nr_victims;
 static bool reclaim_active;
-static atomic_t needs_reclaim = ATOMIC_INIT(0);
+static atomic_t needs_reclaim = ATOMIC_INIT(RECLAIM_NONE);
 static atomic_t needs_reap = ATOMIC_INIT(0);
 static atomic_t nr_killed = ATOMIC_INIT(0);
 
@@ -72,7 +103,7 @@ static unsigned long get_total_mm_pages(struct mm_struct *mm)
 	return pages;
 }
 
-static unsigned long find_victims(int *vindex)
+static unsigned long find_victims(int *vindex, bool unmanaged_only)
 {
 	short i, min_adj = SHRT_MAX, max_adj = 0;
 	unsigned long pages_found = 0;
@@ -93,8 +124,25 @@ static unsigned long find_victims(int *vindex)
 		 */
 		sig = tsk->signal;
 		adj = READ_ONCE(sig->oom_score_adj);
-		if (adj < 0 ||
-		    sig->flags & (SIGNAL_GROUP_EXIT | SIGNAL_GROUP_COREDUMP) ||
+		if (adj < 0) {
+			/*
+			 * In Android, application processes (UID >= 10000) are never
+			 * assigned an unmanaged OOM score (<= -900). Persistent system
+			 * apps receive at most -800 (PERSISTENT_PROC_ADJ). Any app
+			 * process with an adj below -800 has inherited its score from
+			 * zygote and escaped framework OOM management (e.g. leaked or
+			 * orphaned app zygotes). Normalize them to the lowest priority
+			 * (1000) so they are reclaimed first.
+			 */
+			if (task_is_unmanaged(tsk, adj))
+				adj = OOM_SCORE_ADJ_MAX;
+			else
+				continue;
+		} else if (unmanaged_only) {
+			continue;
+		}
+
+		if (sig->flags & (SIGNAL_GROUP_EXIT | SIGNAL_GROUP_COREDUMP) ||
 		    (thread_group_empty(tsk) && tsk->flags & PF_EXITING))
 			continue;
 
@@ -207,7 +255,7 @@ static void set_task_rt_prio(struct task_struct *tsk, int priority)
 #define SLEEP_DURATION_MS 28
 #endif
 
-static void scan_and_kill(void)
+static void scan_and_kill(bool unmanaged_only)
 {
 	int i, nr_to_kill, nr_found = 0;
 	unsigned long pages_found;
@@ -221,9 +269,10 @@ static void scan_and_kill(void)
 	write_unlock(&mm_free_lock);
 
 	/* Populate the victims array with tasks sorted by adj and then size */
-	pages_found = find_victims(&nr_found);
+	pages_found = find_victims(&nr_found, unmanaged_only);
 	if (unlikely(!nr_found)) {
-		pr_err_ratelimited("No processes available to kill!\n");
+		if (!unmanaged_only)
+			pr_err_ratelimited("No processes available to kill!\n");
 		return;
 	}
 
@@ -334,9 +383,11 @@ static int simple_lmk_reclaim_thread(void *data)
 	set_freezable();
 
 	while (1) {
+		int reclaim_type;
+
 		wait_event_freezable(oom_waitq, atomic_read(&needs_reclaim));
-		scan_and_kill();
-		atomic_set(&needs_reclaim, 0);
+		reclaim_type = atomic_xchg(&needs_reclaim, RECLAIM_NONE);
+		scan_and_kill(reclaim_type == RECLAIM_UNMANAGED);
 	}
 
 	return 0;
@@ -463,19 +514,32 @@ void simple_lmk_mm_freed(struct mm_struct *mm)
 	read_unlock(&mm_free_lock);
 }
 
-void simple_lmk_trigger(void)
+static void simple_lmk_wakeup(void)
 {
-	atomic_set(&needs_reclaim, 1);
 	smp_mb__after_atomic();
 	if (waitqueue_active(&oom_waitq))
-	    wake_up(&oom_waitq);
+		wake_up(&oom_waitq);
+}
+
+static void simple_lmk_trigger_unmanaged(void)
+{
+	atomic_cmpxchg(&needs_reclaim, RECLAIM_NONE, RECLAIM_UNMANAGED);
+	simple_lmk_wakeup();
+}
+
+void simple_lmk_trigger(void)
+{
+	atomic_set(&needs_reclaim, RECLAIM_ALL);
+	simple_lmk_wakeup();
 }
 
 static int simple_lmk_vmpressure_cb(struct notifier_block *nb,
 				    unsigned long pressure, void *data)
 {
-	if (pressure >= 95)
+	if (pressure >= VMPRESSURE_CRITICAL)
 		simple_lmk_trigger();
+	else if (pressure >= VMPRESSURE_MEDIUM)
+		simple_lmk_trigger_unmanaged();
 
 	return NOTIFY_OK;
 }
