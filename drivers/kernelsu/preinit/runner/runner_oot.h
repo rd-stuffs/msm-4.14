@@ -69,13 +69,16 @@
 #define getdents64(a, b, c)	syscall(SYS_getdents64, a, b, c)
 #define fsync(fd)		syscall(SYS_fsync, fd)
 #define chdir(path)		syscall(SYS_chdir, path)
-#define fork()			syscall(SYS_clone, SIGCHLD, 0, 0, 0, 0)
 #define setpgid(pid, pgid)	syscall(SYS_setpgid, pid, pgid)
 #define execve(fn, arg, env)	syscall(SYS_execve, fn, arg, env)
 #define pipe2(pipefd, flags)	syscall(SYS_pipe2, pipefd, flags)
 #define nanosleep(req, rem)	syscall(SYS_nanosleep, req, rem)
 #define munmap(addr, len)	syscall(SYS_munmap, addr, len)
+#define read(fd, buf, count)	syscall(SYS_read, fd, buf, count)
 #define write(fd, buf, count)	syscall(SYS_write, fd, buf, count)
+
+// HACK: this should be: syscall(SYS_clone, SIGCHLD, 0, 0, 0, 0)
+#define fork()			syscall(SYS_clone, SIGCHLD)
 
 #if defined(__arm__) // https://elixir.bootlin.com/linux/v3.0.101/source/arch/arm/kernel/entry-common.S#L580
 #define SYS_mmap2 192
@@ -106,12 +109,6 @@ static noinline long __sys_openat(const char *path, int flags, int mode)
 }
 #define __open_impl(path, flags, mode, ...) __sys_openat(path, flags, mode)
 #define open(path, flags, ...) __open_impl(path, flags, ##__VA_ARGS__, 0)
-
-static noinline long __sys_read(int fd, void *buf, size_t count)
-{
-	return syscall(SYS_read, fd, buf, count);
-}
-#define read __sys_read
 
 #if defined(__arm__) // map to fstatat64
 #define SYS_newfstatat SYS_fstatat64
@@ -179,9 +176,15 @@ static int __sys_poll(struct pollfd *fds, nfds_t nfds, int timeout_ms)
 }
 #define poll __sys_poll
 
+#ifndef __NR_init_module
 #define __NR_init_module	SYS_init_module
+#endif
+#ifndef __NR_finit_module
 #define __NR_finit_module	SYS_finit_module
+#endif
+#ifndef __NR_execveat
 #define __NR_execveat		SYS_execveat
+#endif
 
 struct __linux_dirent64 {
 	uint64_t	d_ino;
@@ -198,16 +201,14 @@ struct __linux_dirent64 {
 static noinline long dumb_atol(const char *str)
 {
 	long res = 0;
-
 	if (!str || !*str)
-		return 0;
+		return res;
 start:
 	if (!isdigit((unsigned char)*str))
 		return res;
 
 	res = (res * 10) + (*str - 48);
 	str++;
-
 	if (*str)
 		goto start;
 
@@ -224,6 +225,32 @@ static unsigned long __strlen(const char *str)
 }
 #define strlen __strlen
 
+static noinline char *__strchr(const char *s, int c)
+{
+	unsigned char tgt = (unsigned char)c;
+start:
+	if ((unsigned char)*s == tgt)
+		return (char *)s;
+
+	if (!*s)
+		return NULL;
+	s++;
+	goto start;
+}
+#define strchr __strchr
+
+static void *__memcpy(void *restrict dst, const void *restrict src, size_t count)
+{
+	unsigned char *d = dst;
+	const unsigned char *s = src;
+	while (count--)
+        	*d++ = *s++;
+	return dst;
+}
+#define memcpy __memcpy
+
+#define memcmp __builtin_memcmp
+
 // string functions taken from
 // https://elixir.bootlin.com/linux/v7.3/source/lib/string.c
 static noinline int __strcmp(const char *cs, const char *ct)
@@ -232,23 +259,14 @@ static noinline int __strcmp(const char *cs, const char *ct)
 	while (1) {
 		c1 = *cs++;
 		c2 = *ct++;
-		if (c1 != c2)
-			return c1 < c2 ? -1 : 1;
+		if (c1 != c2) // hack: destroy's -1 / +1 but should be fine, saves 8 bytes
+			return c1 - c2; // return c1 < c2 ? -1 : 1;
 		if (!c1)
 			break;
 	}
 	return 0;
 }
 #define strcmp __strcmp
-
-static noinline char *__strchr(const char *s, int c)
-{
-	for (; *s != (char)c; ++s)
-		if (*s == '\0')
-			return NULL;
-	return (char *)s;
-}
-#define strchr __strchr
 
 static noinline char *__strcpy(char *dest, const char *src)
 {
@@ -269,23 +287,13 @@ static char *__strstr(const char *s1, const char *s2)
 	l1 = strlen(s1);
 	while (l1 >= l2) {
 		l1--;
-		const char *a = s1;
-		const char *b = s2;
-		/* manual memcmp loop, needle always have null term, use it */
-		while (*a == *b && *b) {
-			a++;
-			b++;
-		}
-		if (!*b) // needle hit null, its a match.
+		if (!memcmp(s1, s2, l2))
 			return (char *)s1;
 		s1++;
 	}
 	return NULL;
 }
 #define strstr __strstr
-
-#define memcpy __builtin_memcpy
-#define memcmp __builtin_memcmp
 
 /* buildinfo */
 

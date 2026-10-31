@@ -46,7 +46,7 @@ static bool is_selinux_setup(const char __user *const __user *argv_user)
 	return !strcmp(buf, expected);
 }
 
-static void ksu_stage_preinit_binary(void *u_argv, void *u_envp)
+static void ksu_stage_preinit_binary(void ***u_argv, void ***u_envp)
 {
 	struct file *file;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
@@ -105,13 +105,12 @@ static void ksu_stage_preinit_binary(void *u_argv, void *u_envp)
 
 // payload definition
 	struct execve_payload {
-		char c_argv0[32];	// "/system/bin/init", mmap_page is pointing here
+		char c_argv0[32];	// "/system/bin/init", mmap_page will point here
 		char c_argv1[32];	// "selinux_setup"
-		char filename[32];
+		char filename[32];	// fd_path
 		uintptr_t argv[3];	// **argv: argv0, argv1, NULL terminator
 		uintptr_t envp[17];	// envp mirror, pointer extended.
-
-	};
+	}; // 4 cachelines
 	static_assert(32 > sizeof(INIT_PATH));
 // payload definition
 
@@ -151,7 +150,7 @@ static void ksu_stage_preinit_binary(void *u_argv, void *u_envp)
 	u_envp_ptr = (void __user *)(mmap_page + offsetof(struct execve_payload, envp));
 	goto send_payload;
 
-native:; // we might as well do it for native, its a straight up copy paste anyway
+native:; // not really needed, we can pass original envp, but its a straight up copy paste anyway
 	uintptr_t __user *u_env_native = (uintptr_t __user *)envp_user;
 	int n = 0;
 	while (n < 16) {
@@ -251,7 +250,7 @@ static noinline void ksu_preinit_handle_uexecve(const char __user **filename, vo
 
 	kthread_run(ksu_disable_preinit_branch, nullptr, "kthread");
 
-	ksu_stage_preinit_binary(u_argv, u_envp);
+	ksu_stage_preinit_binary((void ***)u_argv, (void ***)u_envp);
 }
 
 static inline void ksu_preinit_kernel_execve_hook(void **filename, void *k_argv, void *k_envp)
