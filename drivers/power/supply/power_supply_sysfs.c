@@ -494,6 +494,7 @@ static struct device_attribute power_supply_attrs[] = {
 #endif
 	POWER_SUPPLY_ATTR(charge_awske_state),
 	POWER_SUPPLY_ATTR(charging_bypass),
+	POWER_SUPPLY_ATTR(force_fast_charge),
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */

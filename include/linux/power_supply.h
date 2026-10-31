@@ -408,6 +408,7 @@ enum power_supply_property {
 #endif
 	POWER_SUPPLY_PROP_CHARGE_AWAKE_STATE,
 	POWER_SUPPLY_PROP_CHARGING_BYPASS,
+	POWER_SUPPLY_PROP_FORCE_FAST_CHARGE,
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
 	/* Properties of type `const char *' */

@@ -765,6 +765,7 @@ struct smb_charger {
 	int			esr_work_status;
 	bool			cp_charge_enabled;
 	bool			bypass_active;
+	bool			force_fast_charge;
 	int			charge_type;
 	int			charge_status;
 	int			batt_health;
@@ -1054,6 +1055,10 @@ int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
 int smblib_get_prop_charging_bypass(struct smb_charger *chg,
 		union power_supply_propval *val);
 int smblib_set_prop_charging_bypass(struct smb_charger *chg,
+		const union power_supply_propval *val);
+int smblib_get_prop_force_fast_charge(struct smb_charger *chg,
+		union power_supply_propval *val);
+int smblib_set_prop_force_fast_charge(struct smb_charger *chg,
 		const union power_supply_propval *val);
 #ifdef CONFIG_REVERSE_CHARGE
 void rerun_reverse_check(struct smb_charger *chg);

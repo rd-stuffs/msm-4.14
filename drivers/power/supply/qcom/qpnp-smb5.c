@@ -1913,6 +1913,7 @@ static enum power_supply_property smb5_batt_props[] = {
 #endif
 	POWER_SUPPLY_PROP_CHARGE_AWAKE_STATE,
 	POWER_SUPPLY_PROP_CHARGING_BYPASS,
+	POWER_SUPPLY_PROP_FORCE_FAST_CHARGE,
 };
 
 #define DEBUG_ACCESSORY_TEMP_DECIDEGC	250
@@ -2087,6 +2088,9 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGING_BYPASS:
 		rc = smblib_get_prop_charging_bypass(chg, val);
 		break;
+	case POWER_SUPPLY_PROP_FORCE_FAST_CHARGE:
+		rc = smblib_get_prop_force_fast_charge(chg, val);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2253,6 +2257,9 @@ static int smb5_batt_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGING_BYPASS:
 		rc = smblib_set_prop_charging_bypass(chg, val);
 		break;
+	case POWER_SUPPLY_PROP_FORCE_FAST_CHARGE:
+		rc = smblib_set_prop_force_fast_charge(chg, val);
+		break;
 	default:
 		rc = -EINVAL;
 	}
@@ -2279,6 +2286,7 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_BATTERY_CHARGING_LIMITED:
 	case POWER_SUPPLY_PROP_CHARGING_BYPASS:
+	case POWER_SUPPLY_PROP_FORCE_FAST_CHARGE:
 #ifdef CONFIG_REVERSE_CHARGE
 	case POWER_SUPPLY_PROP_REVERSE_CHARGE_MODE:
 #endif

@@ -860,7 +860,7 @@ int smblib_set_fastcharge_mode(struct smb_charger *chg, bool enable)
 		smblib_err(chg, "Couldn't get battery authentic:%d\n", rc);
 		return rc;
 	}
-	if (!pval.intval)
+	if (!chg->force_fast_charge && !pval.intval)
 		enable = false;
 #endif
 
@@ -872,7 +872,7 @@ int smblib_set_fastcharge_mode(struct smb_charger *chg, bool enable)
 		goto set_term;
 	}
 
-	if (enable && pval.intval >= 90) {
+	if (!chg->force_fast_charge && enable && pval.intval >= 90) {
 		smblib_dbg(chg, PR_MISC, "soc:%d is more than 90"
 			"do not setfastcharge mode\n", pval.intval);
 		enable = false;
@@ -885,7 +885,7 @@ int smblib_set_fastcharge_mode(struct smb_charger *chg, bool enable)
 			return rc;
 	}
 
-	if (enable && (pval.intval >= 480 || pval.intval <= 150)) {
+	if (!chg->force_fast_charge && enable && (pval.intval >= 480 || pval.intval <= 150)) {
 			smblib_dbg(chg, PR_MISC, "temp:%d is abort"
 							"do not setfastcharge mode\n", pval.intval);
 			enable = false;
@@ -2542,6 +2542,10 @@ int smblib_get_prop_batt_awake(struct smb_charger *chg,
 int smblib_get_prop_system_temp_level(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
+	if (chg->force_fast_charge) {
+		val->intval = 0;
+		return 0;
+	}
 	val->intval = chg->system_temp_level;
 	return 0;
 }
@@ -2853,6 +2857,33 @@ int smblib_set_prop_charging_bypass(struct smb_charger *chg,
 	return 0;
 }
 
+int smblib_get_prop_force_fast_charge(struct smb_charger *chg,
+				union power_supply_propval *val)
+{
+	val->intval = chg->force_fast_charge;
+	return 0;
+}
+
+int smblib_set_prop_force_fast_charge(struct smb_charger *chg,
+				const union power_supply_propval *val)
+{
+	chg->force_fast_charge = (bool)val->intval;
+	if (chg->force_fast_charge) {
+		vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
+		vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
+		if (chg->support_ffc)
+			smblib_set_fastcharge_mode(chg, true);
+	} else {
+		if (chg->system_temp_level > 0 && chg->thermal_mitigation) {
+			vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
+					chg->thermal_mitigation[chg->system_temp_level]);
+		}
+	}
+
+	power_supply_changed(chg->batt_psy);
+	return 0;
+}
+
 extern union power_supply_propval lct_therm_lvl_reserved;
 extern bool lct_backlight_off;
 extern int LctIsInCall;
@@ -2863,6 +2894,13 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 {
 	if (val->intval < 0)
 		return -EINVAL;
+
+	if (chg->force_fast_charge) {
+		chg->system_temp_level = val->intval;
+		vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
+		vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
+		return 0;
+	}
 
 	if (chg->thermal_levels <= 0)
 		return -EINVAL;
