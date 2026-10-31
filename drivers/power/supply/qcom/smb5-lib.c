@@ -5332,6 +5332,11 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 		 * For PPS, Charge Pump is preferred over parallel charger if
 		 * present.
 		 */
+		if (chg->pd_active == POWER_SUPPLY_PD_PPS_ACTIVE) {
+			chg->pd_verifed = true;
+			vote(chg->usb_icl_votable, PD_VERIFED_VOTER, false, 0);
+		}
+
 		if (chg->pd_active == POWER_SUPPLY_PD_PPS_ACTIVE
 						&& chg->sec_cp_present) {
 			rc = smblib_select_sec_charger(chg,

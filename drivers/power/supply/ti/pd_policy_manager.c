@@ -66,7 +66,7 @@ static struct pdpm_config pm_config = {
 	.fc2_steps			= 1,
 
 	.min_adapter_volt_required	= 10000,
-	.min_adapter_curr_required	= 2000,
+	.min_adapter_curr_required	= 1500,
 
 	.min_vbat_for_cp		= 3000,
 

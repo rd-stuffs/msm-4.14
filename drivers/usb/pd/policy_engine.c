@@ -1056,6 +1056,8 @@ static int pd_eval_src_caps(struct usbpd *pd)
 	val.intval = pps_found ?
 			POWER_SUPPLY_PD_PPS_ACTIVE :
 			POWER_SUPPLY_PD_ACTIVE;
+	if (pps_found)
+		pd->verifed = true;
 	power_supply_set_property(pd->usb_psy,
 			POWER_SUPPLY_PROP_PD_ACTIVE, &val);
 
