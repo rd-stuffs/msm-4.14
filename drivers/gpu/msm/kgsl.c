@@ -5207,6 +5207,7 @@ static void kgsl_core_exit(void)
 	}
 
 	kgsl_events_exit();
+	kgsl_sync_exit();
 	kgsl_core_debugfs_close();
 
 	/*
@@ -5340,6 +5341,10 @@ static int __init kgsl_core_init(void)
 	kgsl_events_init();
 
 	result = kgsl_drawobjs_cache_init();
+	if (result)
+		goto err;
+
+	result = kgsl_sync_init();
 	if (result)
 		goto err;
 

@@ -25,6 +25,7 @@ static void kgsl_sync_timeline_signal(struct kgsl_sync_timeline *timeline,
 	unsigned int timestamp);
 
 static const struct dma_fence_ops kgsl_sync_fence_ops;
+static struct kmem_cache *kgsl_sync_fence_cb_cache;
 
 static struct kgsl_sync_fence *kgsl_sync_fence_create(
 					struct kgsl_context *context,
@@ -446,7 +447,7 @@ static void kgsl_sync_fence_callback(struct dma_fence *fence,
 	 */
 	if (kcb->func(kcb->priv)) {
 		dma_fence_put(kcb->fence);
-		kfree(kcb);
+		kmem_cache_free(kgsl_sync_fence_cb_cache, kcb);
 	}
 }
 
@@ -467,7 +468,7 @@ struct kgsl_sync_fence_cb *kgsl_sync_fence_async_wait(int fd,
 	}
 
 	/* create the callback */
-	kcb = kzalloc(sizeof(*kcb), GFP_KERNEL);
+	kcb = kmem_cache_zalloc(kgsl_sync_fence_cb_cache, GFP_KERNEL);
 	if (kcb == NULL) {
 		dma_fence_put(fence);
 		return ERR_PTR(-ENOMEM);
@@ -482,7 +483,7 @@ struct kgsl_sync_fence_cb *kgsl_sync_fence_async_wait(int fd,
 				kgsl_sync_fence_callback);
 
 	if (status) {
-		kfree(kcb);
+		kmem_cache_free(kgsl_sync_fence_cb_cache, kcb);
 		if (!dma_fence_is_signaled(fence))
 			kcb = ERR_PTR(status);
 		else
@@ -510,7 +511,7 @@ void kgsl_sync_fence_async_cancel(struct kgsl_sync_fence_cb *kcb)
 	 */
 	dma_fence_remove_callback(kcb->fence, &kcb->fence_cb);
 	dma_fence_put(kcb->fence);
-	kfree(kcb);
+	kmem_cache_free(kgsl_sync_fence_cb_cache, kcb);
 }
 
 struct kgsl_syncsource {
@@ -866,4 +867,17 @@ static const struct dma_fence_ops kgsl_syncsource_fence_ops = {
 
 	.fence_value_str = kgsl_syncsource_fence_value_str,
 };
+
+int __init kgsl_sync_init(void)
+{
+	kgsl_sync_fence_cb_cache = KMEM_CACHE(kgsl_sync_fence_cb, 0);
+	if (!kgsl_sync_fence_cb_cache)
+		return -ENOMEM;
+	return 0;
+}
+
+void kgsl_sync_exit(void)
+{
+	kmem_cache_destroy(kgsl_sync_fence_cb_cache);
+}
 

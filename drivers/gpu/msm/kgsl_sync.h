@@ -112,6 +112,9 @@ void kgsl_syncsource_put(struct kgsl_syncsource *syncsource);
 void kgsl_syncsource_process_release_syncsources(
 		struct kgsl_process_private *private);
 
+int __init kgsl_sync_init(void);
+void kgsl_sync_exit(void);
+
 #else
 static inline int kgsl_add_fence_event(struct kgsl_device *device,
 	u32 context_id, u32 timestamp, void __user *data, int len,
@@ -183,6 +186,15 @@ static inline void kgsl_syncsource_process_release_syncsources(
 		struct kgsl_process_private *private)
 {
 
+}
+
+static inline int kgsl_sync_init(void)
+{
+	return 0;
+}
+
+static inline void kgsl_sync_exit(void)
+{
 }
 
 #endif /* CONFIG_SYNC_FILE */
