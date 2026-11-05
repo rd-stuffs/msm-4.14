@@ -171,6 +171,12 @@ void __wake_up_locked(struct wait_queue_head *wq_head, unsigned int mode, int nr
 }
 EXPORT_SYMBOL_GPL(__wake_up_locked);
 
+void __wake_up_locked_sync(struct wait_queue_head *wq_head, unsigned int mode, int nr)
+{
+	__wake_up_common(wq_head, mode, nr, 1 /* WF_SYNC */, NULL, NULL);
+}
+EXPORT_SYMBOL_GPL(__wake_up_locked_sync);
+
 void __wake_up_locked_key(struct wait_queue_head *wq_head, unsigned int mode, void *key)
 {
 	__wake_up_common(wq_head, mode, 1, 0, key, NULL);
