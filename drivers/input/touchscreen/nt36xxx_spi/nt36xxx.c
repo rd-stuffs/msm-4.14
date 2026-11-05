@@ -1193,9 +1193,9 @@ Description:
 return:
 	n.a.
 *******************************************************/
-static void nvt_ts_worker(struct work_struct *work)
+static irqreturn_t nvt_ts_work_func(int irq, void *data)
 {
-	struct nvt_ts_data *ts = container_of(work, struct nvt_ts_data, irq_work);
+	struct nvt_ts_data *ts = data;
 
 	int32_t ret = -1;
 	uint8_t point_data[POINT_DATA_LEN + 1 + DUMMY_BYTES] = {0};
@@ -1217,7 +1217,7 @@ static void nvt_ts_worker(struct work_struct *work)
 		ret = wait_for_completion_timeout(&ts->dev_pm_suspend_completion, msecs_to_jiffies(700));
 		if (!ret) {
 			NVT_ERR("system(spi bus) can't finished resuming procedure, skip it");
-			return;
+			return IRQ_HANDLED;
 		}
 	}
 #endif
@@ -1264,7 +1264,7 @@ static void nvt_ts_worker(struct work_struct *work)
 		//input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
 		mutex_unlock(&ts->lock);
-		return;
+		return IRQ_HANDLED;
 	}
 #endif
 	finger_cnt = 0;
@@ -1325,11 +1325,14 @@ static void nvt_ts_worker(struct work_struct *work)
 
 #if MT_PROTOCOL_B
 	for (i = 0; i < ts->max_touch_num; i++) {
-		if (press_id[i] != 1) {
+		if (press_id[i]) {
+			ts->active_slots |= BIT(i);
+		} else if (ts->active_slots & BIT(i)) {
 			input_mt_slot(ts->input_dev, i);
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
 			input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, false);
+			ts->active_slots &= ~BIT(i);
 		}
 	}
 
@@ -1362,13 +1365,6 @@ static void nvt_ts_worker(struct work_struct *work)
 XFER_ERROR:
 
 	mutex_unlock(&ts->lock);
-	return;
-}
-
-static irqreturn_t nvt_ts_work_func(int irq, void *data)
-{
-	struct nvt_ts_data *ts = data;
-	queue_work(ts->coord_workqueue, &ts->irq_work);
 	return IRQ_HANDLED;
 }
 
@@ -1842,20 +1838,13 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 #endif
 
-	ts->coord_workqueue = alloc_workqueue("nvt_ts_workqueue", WQ_HIGHPRI, 0);
-	if (!ts->coord_workqueue) {
-		NVT_ERR("create nvt_ts_workqueue fail");
-		ret = -ENOMEM;
-		goto err_create_nvt_ts_workqueue_failed;
-	}
-	INIT_WORK(&ts->irq_work, nvt_ts_worker);
+#if defined(CONFIG_FB)
 	ts->workqueue = create_singlethread_workqueue("nvt_ts_workqueue");
 	if (!ts->workqueue) {
 		NVT_ERR("create nvt_ts_workqueue fail");
 		ret = -ENOMEM;
 		goto err_create_nvt_ts_workqueue_failed;
 	}
-#if defined(CONFIG_FB)
 	INIT_WORK(&ts->resume_work, nvt_ts_resume_work);
 #ifdef _MSM_DRM_NOTIFY_H_
 	ts->drm_notif.notifier_call = nvt_drm_notifier_callback;
@@ -1907,8 +1896,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	return 0;
 
 err_create_nvt_ts_workqueue_failed:
-	if (ts->coord_workqueue)
-		destroy_workqueue(ts->coord_workqueue);
 #if defined(CONFIG_FB)
 	if (ts->workqueue)
 		destroy_workqueue(ts->workqueue);
@@ -2000,9 +1987,6 @@ return:
 static int32_t nvt_ts_remove(struct spi_device *client)
 {
 	NVT_LOG("Removing driver...\n");
-
-	if (ts->coord_workqueue)
-		destroy_workqueue(ts->coord_workqueue);
 
 #if defined(CONFIG_FB)
 	if (ts->workqueue)
@@ -2206,6 +2190,7 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
 		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, 0);
 	}
+	ts->active_slots = 0;
 #endif
 	input_report_key(ts->input_dev, BTN_TOUCH, 0);
 #if !MT_PROTOCOL_B
@@ -2275,6 +2260,7 @@ static int32_t nvt_ts_resume(struct device *dev)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	bTouchIsAwake = 1;
+	ts->active_slots = 0;
 	NVT_LOG("bTouchIsAwake = 1\n");
 	mutex_unlock(&ts->lock);
 
