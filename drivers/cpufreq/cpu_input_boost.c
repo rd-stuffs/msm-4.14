@@ -30,6 +30,7 @@ struct boost_drv {
 	struct notifier_block cpu_notif;
 	struct notifier_block msm_drm_notif;
 	wait_queue_head_t boost_waitq;
+	atomic_long_t input_boost_expires;
 	atomic_long_t max_boost_expires;
 	unsigned long state;
 	unsigned long last_input_jiffies;
@@ -43,7 +44,9 @@ static struct boost_drv boost_drv_g __read_mostly = {
 						    input_unboost_worker, 0),
 	.max_unboost = __DELAYED_WORK_INITIALIZER(boost_drv_g.max_unboost,
 						  max_unboost_worker, 0),
-	.boost_waitq = __WAIT_QUEUE_HEAD_INITIALIZER(boost_drv_g.boost_waitq)
+	.boost_waitq = __WAIT_QUEUE_HEAD_INITIALIZER(boost_drv_g.boost_waitq),
+	.input_boost_expires = ATOMIC_LONG_INIT(0),
+	.max_boost_expires = ATOMIC_LONG_INIT(0)
 };
 
 static unsigned int get_input_boost_freq(struct cpufreq_policy *policy)
@@ -83,12 +86,25 @@ bool cpu_input_boost_within_input(unsigned long timeout_ms)
 
 static void __cpu_input_boost_kick(struct boost_drv *b)
 {
+	unsigned long boost_jiffies = msecs_to_jiffies(CONFIG_INPUT_BOOST_DURATION_MS);
+	unsigned long curr_expires, new_expires;
+
 	if (test_bit(SCREEN_OFF, &b->state) || (CONFIG_INPUT_BOOST_DURATION_MS == 0))
 		return;
 
+	do {
+		curr_expires = atomic_long_read(&b->input_boost_expires);
+		new_expires = jiffies + boost_jiffies;
+
+		/* Skip delayed work reschedule if already boosted with > half headroom */
+		if (test_bit(INPUT_BOOST, &b->state) &&
+		    time_after(curr_expires, new_expires - boost_jiffies / 2))
+			return;
+	} while (atomic_long_cmpxchg(&b->input_boost_expires, curr_expires,
+				     new_expires) != curr_expires);
+
 	set_bit(INPUT_BOOST, &b->state);
-	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
-			      msecs_to_jiffies(CONFIG_INPUT_BOOST_DURATION_MS)))
+	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost, boost_jiffies))
 		wake_up(&b->boost_waitq);
 }
 
@@ -136,6 +152,7 @@ static void input_unboost_worker(struct work_struct *work)
 	struct boost_drv *b = container_of(to_delayed_work(work),
 					   typeof(*b), input_unboost);
 
+	atomic_long_set(&b->input_boost_expires, 0);
 	clear_bit(INPUT_BOOST, &b->state);
 	wake_up(&b->boost_waitq);
 }
@@ -229,6 +246,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb, unsigned long action,
 		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS);
 	} else {
 		set_bit(SCREEN_OFF, &b->state);
+		atomic_long_set(&b->input_boost_expires, 0);
 		wake_up(&b->boost_waitq);
 	}
 

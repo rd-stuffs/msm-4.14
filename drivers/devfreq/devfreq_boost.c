@@ -23,6 +23,7 @@ struct boost_dev {
 	struct delayed_work input_unboost;
 	struct delayed_work max_unboost;
 	wait_queue_head_t boost_waitq;
+	atomic_long_t input_boost_expires;
 	atomic_long_t max_boost_expires;
 	unsigned long boost_freq;
 	unsigned long state;
@@ -46,6 +47,8 @@ static void devfreq_max_unboost(struct work_struct *work);
 					   devfreq_max_unboost, 0),		\
 	.boost_waitq =								\
 		__WAIT_QUEUE_HEAD_INITIALIZER((b).devices[dev].boost_waitq),	\
+	.input_boost_expires = ATOMIC_LONG_INIT(0),				\
+	.max_boost_expires = ATOMIC_LONG_INIT(0),				\
 	.boost_freq = freq							\
 }
 
@@ -58,12 +61,25 @@ static struct df_boost_drv df_boost_drv_g __read_mostly = {
 
 static void __devfreq_boost_kick(struct boost_dev *b)
 {
+	unsigned long boost_jiffies = msecs_to_jiffies(CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS);
+	unsigned long curr_expires, new_expires;
+
 	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
 		return;
 
+	do {
+		curr_expires = atomic_long_read(&b->input_boost_expires);
+		new_expires = jiffies + boost_jiffies;
+
+		/* Skip delayed work reschedule if already boosted with > half headroom */
+		if (test_bit(INPUT_BOOST, &b->state) &&
+		    time_after(curr_expires, new_expires - boost_jiffies / 2))
+			return;
+	} while (atomic_long_cmpxchg(&b->input_boost_expires, curr_expires,
+				     new_expires) != curr_expires);
+
 	set_bit(INPUT_BOOST, &b->state);
-	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
-		msecs_to_jiffies(CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS))) {
+	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost, boost_jiffies)) {
 		/* Set the bit again in case we raced with the unboost worker */
 		set_bit(INPUT_BOOST, &b->state);
 		wake_up(&b->boost_waitq);
@@ -136,6 +152,7 @@ static void devfreq_input_unboost(struct work_struct *work)
 	struct boost_dev *b = container_of(to_delayed_work(work), typeof(*b),
 					   input_unboost);
 
+	atomic_long_set(&b->input_boost_expires, 0);
 	clear_bit(INPUT_BOOST, &b->state);
 	wake_up(&b->boost_waitq);
 }
@@ -217,6 +234,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
 		} else {
 			set_bit(SCREEN_OFF, &b->state);
+			atomic_long_set(&b->input_boost_expires, 0);
 			wake_up(&b->boost_waitq);
 		}
 	}
