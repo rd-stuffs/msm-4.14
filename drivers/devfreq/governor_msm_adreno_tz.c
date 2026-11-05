@@ -336,6 +336,9 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 	int val, level = 0;
 	unsigned int scm_data[4];
 	int context_count = 0;
+	unsigned int refresh_rate;
+	unsigned int floor = FLOOR;
+	unsigned int ceiling = CEILING;
 
 	/* keeps stats.private_data == NULL   */
 	result = devfreq->profile->get_dev_status(devfreq->dev.parent, &stats);
@@ -353,14 +356,21 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 
 	/* Update the GPU load statistics */
 	compute_work_load(&stats, priv, devfreq);
+
+	refresh_rate = dsi_panel_get_refresh_rate();
+	if (refresh_rate > 60) {
+		floor = (FLOOR * 60) / refresh_rate;
+		ceiling = (CEILING * 60) / refresh_rate;
+	}
+
 	/*
 	 * Do not waste CPU cycles running this algorithm if
-	 * the GPU just started, or if less than FLOOR time
+	 * the GPU just started, or if less than floor time
 	 * has passed since the last run or the gpu hasn't been
 	 * busier than MIN_BUSY.
 	 */
 	if ((stats.total_time == 0) ||
-		(priv->bin.total_time < FLOOR) ||
+		(priv->bin.total_time < floor) ||
 		(unsigned int) priv->bin.busy_time < MIN_BUSY) {
 		return 0;
 	}
@@ -376,11 +386,9 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 	 * increase frequency.  Otherwise run the normal algorithm.
 	 */
 	if (!priv->disable_busy_time_burst &&
-			priv->bin.busy_time > CEILING) {
+			priv->bin.busy_time > ceiling) {
 		val = -1 * level;
 	} else {
-		unsigned int refresh_rate = dsi_panel_get_refresh_rate();
-
 		scm_data[0] = level;
 		scm_data[1] = priv->bin.total_time;
 		scm_data[2] = priv->bin.busy_time * refresh_rate / 30;
