@@ -15,6 +15,8 @@
 #include <linux/compat.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
+#include <linux/cpu_input_boost.h>
+#include <linux/devfreq_boost.h>
 #include "kgsl_device.h"
 #include "kgsl_sync.h"
 #include "adreno.h"
@@ -173,9 +175,14 @@ static long __kgsl_ioctl(struct file *filep, unsigned int cmd,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	long ret;
 
-	if (cmd == IOCTL_KGSL_GPU_COMMAND &&
-	    READ_ONCE(device->state) != KGSL_STATE_ACTIVE)
-		kgsl_schedule_work(&adreno_dev->pwr_on_work);
+	if (cmd == IOCTL_KGSL_GPU_COMMAND ||
+	    cmd == IOCTL_KGSL_GPU_SPARSE_COMMAND) {
+		if (READ_ONCE(device->state) != KGSL_STATE_ACTIVE)
+			kgsl_schedule_work(&adreno_dev->pwr_on_work);
+		cpu_input_boost_kick();
+		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
+		devfreq_boost_kick(DEVFREQ_MSM_LLCCBW);
+	}
 
 	ret = kgsl_ioctl_helper(filep, cmd, arg, kgsl_ioctl_funcs,
 		ARRAY_SIZE(kgsl_ioctl_funcs));
