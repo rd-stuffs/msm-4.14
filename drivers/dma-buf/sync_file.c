@@ -58,7 +58,8 @@ static void fence_check_cb_func(struct dma_fence *f, struct dma_fence_cb *cb)
 
 	sync_file = container_of(cb, struct sync_file, cb);
 
-	wake_up_all(&sync_file->wq);
+	__wake_up(&sync_file->wq, TASK_NORMAL, 0,
+		  (void *)(POLLIN | POLLRDNORM));
 }
 
 /**
@@ -292,7 +293,8 @@ static unsigned int sync_file_poll(struct file *file, poll_table *wait)
 	    !test_and_set_bit(POLL_ENABLED, &sync_file->flags)) {
 		if (dma_fence_add_callback(sync_file->fence, &sync_file->cb,
 					   fence_check_cb_func) < 0)
-			wake_up_all(&sync_file->wq);
+			__wake_up(&sync_file->wq, TASK_NORMAL, 0,
+				  (void *)(POLLIN | POLLRDNORM));
 	}
 
 	return dma_fence_is_signaled(sync_file->fence) ? POLLIN : 0;
