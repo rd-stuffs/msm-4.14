@@ -176,7 +176,9 @@ static long __kgsl_ioctl(struct file *filep, unsigned int cmd,
 	long ret;
 
 	if (cmd == IOCTL_KGSL_GPU_COMMAND ||
-	    cmd == IOCTL_KGSL_GPU_SPARSE_COMMAND) {
+	    cmd == IOCTL_KGSL_GPU_SPARSE_COMMAND ||
+	    cmd == IOCTL_KGSL_SUBMIT_COMMANDS ||
+	    cmd == IOCTL_KGSL_RINGBUFFER_ISSUEIBCMDS) {
 		if (READ_ONCE(device->state) != KGSL_STATE_ACTIVE)
 			kgsl_schedule_work(&adreno_dev->pwr_on_work);
 		cpu_input_boost_kick();
