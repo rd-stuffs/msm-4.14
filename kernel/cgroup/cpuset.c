@@ -58,7 +58,6 @@
 #include <linux/backing-dev.h>
 #include <linux/sort.h>
 #include <linux/oom.h>
-#include <linux/task_blocklist.h>
 
 #include <linux/uaccess.h>
 #include <linux/atomic.h>
@@ -1791,23 +1790,23 @@ static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of,
 					 char *buf, size_t nbytes, loff_t off)
 {
 #ifdef CONFIG_CPUSET_ASSIST
-	char name_buf[NAME_MAX + 1];
-	static struct cs_target cs_targets[] = {
-		{ "audio-app",		CONFIG_CPUSET_AUDIO_APP },
-		{ "background",		CONFIG_CPUSET_BG },
-		{ "camera-daemon",	CONFIG_CPUSET_CAMERA },
-		{ "foreground",		CONFIG_CPUSET_FG },
-		{ "foreground_window",	CONFIG_CPUSET_FOREGROUND_WINDOW },
-		{ "nnapi-hal",		CONFIG_CPUSET_NNAPI_HAL },
-		{ "restricted",		CONFIG_CPUSET_RESTRICTED },
-		{ "rt",			CONFIG_CPUSET_RT },
-		{ "system-background",	CONFIG_CPUSET_SYSTEM_BG },
-		{ "top-app",		CONFIG_CPUSET_TOP_APP },
-	};
-	struct cpuset *cs = css_cs(of_css(of));
-	int i;
+	if (of_cft(of)->private == FILE_CPULIST) {
+		char name_buf[NAME_MAX + 1];
+		static struct cs_target cs_targets[] = {
+			{ "audio-app",		CONFIG_CPUSET_AUDIO_APP },
+			{ "background",		CONFIG_CPUSET_BG },
+			{ "camera-daemon",	CONFIG_CPUSET_CAMERA },
+			{ "foreground",		CONFIG_CPUSET_FG },
+			{ "foreground_window",	CONFIG_CPUSET_FOREGROUND_WINDOW },
+			{ "nnapi-hal",		CONFIG_CPUSET_NNAPI_HAL },
+			{ "restricted",		CONFIG_CPUSET_RESTRICTED },
+			{ "rt",			CONFIG_CPUSET_RT },
+			{ "system-background",	CONFIG_CPUSET_SYSTEM_BG },
+			{ "top-app",		CONFIG_CPUSET_TOP_APP },
+		};
+		struct cpuset *cs = css_cs(of_css(of));
+		int i;
 
-	if (task_is_blocklisted(current)) {
 		for (i = 0; i < ARRAY_SIZE(cs_targets); i++) {
 			struct cs_target tgt = cs_targets[i];
 
