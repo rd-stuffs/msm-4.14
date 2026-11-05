@@ -669,36 +669,39 @@ static void binder_do_set_priority(struct task_struct *task,
 				   bool verify)
 {
 	int priority; /* user-space prio value */
-	bool has_cap_nice;
 	unsigned int policy = desired.sched_policy;
 
 	if (task->policy == policy && task->normal_prio == desired.prio)
 		return;
 
-	has_cap_nice = has_capability_noaudit(task, CAP_SYS_NICE);
-
 	priority = to_userspace_prio(policy, desired.prio);
 
-	if (verify && is_rt_policy(policy) && !has_cap_nice) {
-		long max_rtprio = task_rlimit(task, RLIMIT_RTPRIO);
+	if (verify) {
+		if (is_rt_policy(policy)) {
+			long max_rtprio = task_rlimit(task, RLIMIT_RTPRIO);
 
-		if (max_rtprio == 0) {
-			policy = SCHED_NORMAL;
-			priority = MIN_NICE;
-		} else if (priority > max_rtprio) {
-			priority = max_rtprio;
+			if (max_rtprio == 0) {
+				if (!has_capability_noaudit(task, CAP_SYS_NICE)) {
+					policy = SCHED_NORMAL;
+					priority = MIN_NICE;
+				}
+			} else if (priority > max_rtprio) {
+				if (!has_capability_noaudit(task, CAP_SYS_NICE))
+					priority = max_rtprio;
+			}
 		}
-	}
 
-	if (verify && is_fair_policy(policy) && !has_cap_nice) {
-		long min_nice = rlimit_to_nice(task_rlimit(task, RLIMIT_NICE));
+		if (is_fair_policy(policy)) {
+			long min_nice = rlimit_to_nice(task_rlimit(task, RLIMIT_NICE));
 
-		if (min_nice > MAX_NICE) {
-			binder_user_error("%d RLIMIT_NICE not set\n",
-					  task->pid);
-			return;
-		} else if (priority < min_nice) {
-			priority = min_nice;
+			if (min_nice > MAX_NICE) {
+				binder_user_error("%d RLIMIT_NICE not set\n",
+						  task->pid);
+				return;
+			} else if (priority < min_nice) {
+				if (!has_capability_noaudit(task, CAP_SYS_NICE))
+					priority = min_nice;
+			}
 		}
 	}
 
@@ -714,7 +717,8 @@ static void binder_do_set_priority(struct task_struct *task,
 				  desired.prio);
 
 	/* Set the actual priority */
-	if (task->policy != policy || is_rt_policy(policy)) {
+	if (task->policy != policy ||
+	    (is_rt_policy(policy) && task->rt_priority != priority)) {
 		struct sched_param params;
 
 		params.sched_priority = is_rt_policy(policy) ? priority : 0;
