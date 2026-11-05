@@ -8,6 +8,7 @@
 #include <linux/types.h>
 
 #ifdef CONFIG_CPU_INPUT_BOOST
+extern unsigned int zygote_boost_duration;
 void cpu_input_boost_kick(void);
 void cpu_input_boost_kick_max(unsigned int duration_ms);
 bool cpu_input_boost_within_input(unsigned long timeout_ms);

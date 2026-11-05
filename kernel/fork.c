@@ -2238,11 +2238,12 @@ long _do_fork(struct kernel_clone_args *args)
 	int trace = 0;
 	long nr;
 
-	/* Boost to the max for 150 ms when userspace launches an app */
+	/* Boost to the max for zygote_boost_duration ms when userspace launches an app */
 	if (task_is_zygote(current)) {
-		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
-		cpu_input_boost_kick_max(150);
+		unsigned int dur = READ_ONCE(zygote_boost_duration);
+		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, dur);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, dur);
+		cpu_input_boost_kick_max(dur);
 	}
 
 	/*
