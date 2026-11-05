@@ -4414,6 +4414,12 @@ retry:
 		wake_all_kshrinkds(ac);
 		woke_kshrinkd = true;
 	}
+
+	/* Boost when entering direct reclaim to reduce allocation latency */
+	cpu_input_boost_kick_max(150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
+
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
 							&did_some_progress);
 	if (page)

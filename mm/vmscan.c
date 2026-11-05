@@ -55,6 +55,8 @@
 #include <linux/ctype.h>
 #include <linux/debugfs.h>
 #include <linux/simple_lmk.h>
+#include <linux/cpu_input_boost.h>
+#include <linux/devfreq_boost.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -6544,6 +6546,9 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 	trace_mm_vmscan_wakeup_kswapd(pgdat->node_id, classzone_idx, order);
 	wake_up_interruptible(&pgdat->kswapd_wait);
 	wake_up_interruptible(&pgdat->kshrinkd_wait);
+	cpu_input_boost_kick_max(150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
 }
 
 #ifdef CONFIG_HIBERNATION
