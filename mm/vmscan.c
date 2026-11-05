@@ -6546,9 +6546,9 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 	trace_mm_vmscan_wakeup_kswapd(pgdat->node_id, classzone_idx, order);
 	wake_up_interruptible(&pgdat->kswapd_wait);
 	wake_up_interruptible(&pgdat->kshrinkd_wait);
-	cpu_input_boost_kick_max(150);
-	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 150);
-	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
+	cpu_input_boost_kick_max(READ_ONCE(reclaim_boost_duration));
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, READ_ONCE(reclaim_boost_duration));
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, READ_ONCE(reclaim_boost_duration));
 }
 
 #ifdef CONFIG_HIBERNATION

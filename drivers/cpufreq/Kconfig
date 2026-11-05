@@ -297,6 +297,25 @@ config MIN_FREQ_PERF
 	default "0"
 	help
 	  Min freq to set for hp cluster when boost is over.
+
+config ZYGOTE_BOOST_DURATION_MS
+	int "Zygote fork boost duration"
+	default "120"
+	help
+	  Duration in milliseconds to boost CPUs when zygote forks a process.
+
+config CGROUP_BOOST_DURATION_MS
+	int "Top-app cgroup attach boost duration"
+	default "400"
+	help
+	  Duration in milliseconds to boost CPUs when a process attaches to the
+	  top-app cgroup.
+
+config RECLAIM_BOOST_DURATION_MS
+	int "Memory reclaim boost duration"
+	default "150"
+	help
+	  Duration in milliseconds to boost CPUs during direct memory reclaim.
 endif
 
 comment "CPU frequency scaling drivers"

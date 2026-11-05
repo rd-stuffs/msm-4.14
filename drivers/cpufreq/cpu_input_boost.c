@@ -18,13 +18,17 @@ static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
 static unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
 static unsigned int wake_boost_duration = CONFIG_WAKE_BOOST_DURATION_MS;
-unsigned int zygote_boost_duration = 150;
+unsigned int zygote_boost_duration = CONFIG_ZYGOTE_BOOST_DURATION_MS;
+unsigned int cgroup_boost_duration = CONFIG_CGROUP_BOOST_DURATION_MS;
+unsigned int reclaim_boost_duration = CONFIG_RECLAIM_BOOST_DURATION_MS;
 
 module_param(input_boost_freq_lp, uint, 0644);
 module_param(input_boost_freq_hp, uint, 0644);
 module_param(input_boost_duration, short, 0644);
 module_param(wake_boost_duration, uint, 0644);
 module_param(zygote_boost_duration, uint, 0644);
+module_param(cgroup_boost_duration, uint, 0644);
+module_param(reclaim_boost_duration, uint, 0644);
 
 /* The sched_param struct is located elsewhere in newer kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
