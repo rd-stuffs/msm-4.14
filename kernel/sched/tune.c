@@ -1,4 +1,3 @@
-#include <linux/task_blocklist.h>
 #include <linux/cgroup.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
@@ -685,11 +684,45 @@ static int prefer_high_cap_write(struct cgroup_subsys_state *css,
 }
 
 #ifdef CONFIG_STUNE_ASSIST
+struct st_data {
+	const char *name;
+	int boost;
+	bool prefer_idle;
+};
+
+static const struct st_data st_targets[] = {
+	{"audio-app",		0, 0},
+	{"background",		0, 0},
+	{"camera-daemon",	0, 1},
+	{"foreground",		0, 1},
+	{"foreground_window",	0, 1},
+	{"nnapi-hal",		0, 1},
+	{"restricted",		0, 0},
+	{"rt",			0, 0},
+	{"system-background",	0, 0},
+	{"top-app",		10, 1},
+};
+
+static const struct st_data *schedtune_get_target(struct cgroup_subsys_state *css)
+{
+	char name_buf[NAME_MAX + 1];
+	int i;
+
+	cgroup_name(css->cgroup, name_buf, sizeof(name_buf));
+	for (i = 0; i < ARRAY_SIZE(st_targets); i++) {
+		if (!strcmp(name_buf, st_targets[i].name))
+			return &st_targets[i];
+	}
+	return NULL;
+}
+
 static int boost_write_wrapper(struct cgroup_subsys_state *css,
 			       struct cftype *cft, s64 boost)
 {
-	if (task_is_blocklisted(current))
-		return 0;
+	const struct st_data *tgt = schedtune_get_target(css);
+
+	if (tgt)
+		return boost_write(css, cft, tgt->boost);
 
 	return boost_write(css, cft, boost);
 }
@@ -697,8 +730,10 @@ static int boost_write_wrapper(struct cgroup_subsys_state *css,
 static int prefer_idle_write_wrapper(struct cgroup_subsys_state *css,
 				     struct cftype *cft, u64 prefer_idle)
 {
-	if (task_is_blocklisted(current))
-		return 0;
+	const struct st_data *tgt = schedtune_get_target(css);
+
+	if (tgt)
+		return prefer_idle_write(css, cft, tgt->prefer_idle);
 
 	return prefer_idle_write(css, cft, prefer_idle);
 }
@@ -756,39 +791,15 @@ schedtune_boostgroup_init(struct schedtune *st)
 }
 
 #ifdef CONFIG_STUNE_ASSIST
-struct st_data {
-	char *name;
-	int boost;
-	bool prefer_idle;
-};
-
 static void write_default_values(struct cgroup_subsys_state *css)
 {
-	char name_buf[NAME_MAX + 1];
-	static struct st_data st_targets[] = {
-		{"audio-app",		0, 0},
-		{"background",		0, 0},
-		{"camera-daemon",	0, 1},
-		{"foreground",		0, 1},
-		{"foreground_window",	0, 1},
-		{"nnapi-hal",		0, 1},
-		{"restricted",		0, 0},
-		{"rt",			0, 0},
-		{"system-background",	0, 0},
-		{"top-app",		0, 1},
-	};
-	int i;
+	const struct st_data *tgt = schedtune_get_target(css);
 
-	for (i = 0; i < ARRAY_SIZE(st_targets); i++) {
-		struct st_data tgt = st_targets[i];
-
-		cgroup_name(css->cgroup, name_buf, sizeof(name_buf));
-		if (!strcmp(name_buf, tgt.name)) {
-			boost_write(css, NULL, tgt.boost);
-			prefer_idle_write(css, NULL, tgt.prefer_idle);
-			pr_info("stune_assist: setting values for %s: boost=%d prefer_idle=%d\n",
-				tgt.name, tgt.boost, tgt.prefer_idle);
-		}
+	if (tgt) {
+		boost_write(css, NULL, tgt->boost);
+		prefer_idle_write(css, NULL, tgt->prefer_idle);
+		pr_info("stune_assist: setting values for %s: boost=%d prefer_idle=%d\n",
+			tgt->name, tgt->boost, tgt->prefer_idle);
 	}
 }
 #endif
