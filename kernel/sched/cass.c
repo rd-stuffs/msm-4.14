@@ -176,10 +176,13 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	int cidx = 0, cpu;
 
 	/*
-	 * Get the stune-boosted utilization for this task. Note that RT tasks
-	 * don't have per-entity load tracking so their utilization is zero.
+	 * Use the task's estimated utilization for placement. SchedTune boost
+	 * margin is intentionally excluded here to prevent medium-load helper
+	 * threads from falsely overflowing little core capacity and crowding
+	 * the big CPU cluster. SchedTune boost margin remains active in
+	 * boosted_cpu_util() for DVFS frequency scaling.
 	 */
-	p_util = rt ? 0 : boosted_task_util(p);
+	p_util = rt ? 0 : task_util_est(p);
 
 	/*
 	 * Find the best CPU to wake @p on. Although idle_get_state() requires
