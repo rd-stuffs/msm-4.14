@@ -293,7 +293,8 @@ static void evdev_pass_values(struct evdev_client *client,
 	spin_unlock(&client->buffer_lock);
 
 	if (wakeup)
-		wake_up_interruptible(&evdev->wait);
+		wake_up_interruptible_sync_poll(&evdev->wait,
+						POLLIN | POLLRDNORM);
 }
 
 /*
