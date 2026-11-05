@@ -247,7 +247,7 @@ static struct sync_file *sync_file_merge(struct sync_file *a,
 	if (i == 0)
 		fences[i++] = dma_fence_get(a_fences[0]);
 
-	if (num_fences > i) {
+	if (num_fences > i && i > 1) {
 		nfences = krealloc(fences, i * sizeof(*fences),
 				  GFP_KERNEL);
 		if (!nfences)
