@@ -717,18 +717,28 @@ static void binder_do_set_priority(struct task_struct *task,
 				  desired.prio);
 
 	/* Set the actual priority */
-	if (task->policy != policy ||
-	    (is_rt_policy(policy) && task->rt_priority != priority)) {
-		struct sched_param params;
+	if (task->policy != policy) {
+		struct sched_attr attr = {
+			.sched_policy = policy,
+			.sched_flags = SCHED_FLAG_RESET_ON_FORK,
+			.sched_priority = is_rt_policy(policy) ? priority : 0,
+			.sched_nice = is_fair_policy(policy) ? priority : 0,
+		};
 
-		params.sched_priority = is_rt_policy(policy) ? priority : 0;
+		sched_setattr_nocheck(task, &attr);
+	} else if (is_rt_policy(policy)) {
+		if (task->rt_priority != priority) {
+			struct sched_attr attr = {
+				.sched_policy = policy,
+				.sched_flags = SCHED_FLAG_RESET_ON_FORK,
+				.sched_priority = priority,
+			};
 
-		sched_setscheduler_nocheck(task,
-					   policy | SCHED_RESET_ON_FORK,
-					   &params);
-	}
-	if (is_fair_policy(policy))
+			sched_setattr_nocheck(task, &attr);
+		}
+	} else if (is_fair_policy(policy)) {
 		set_user_nice(task, priority);
+	}
 }
 
 static void binder_set_priority(struct task_struct *task,
