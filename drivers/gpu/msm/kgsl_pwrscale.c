@@ -16,11 +16,22 @@
 #include <linux/hrtimer.h>
 #include <linux/devfreq_cooling.h>
 #include <linux/pm_opp.h>
+#include <drm/drm_refresh_rate.h>
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
 #include "kgsl_device.h"
 #include "kgsl_trace.h"
+
+static inline unsigned int kgsl_governor_call_interval(void)
+{
+	unsigned int refresh_rate = dsi_panel_get_refresh_rate();
+
+	if (refresh_rate > 60)
+		return (KGSL_GOVERNOR_CALL_INTERVAL * 60) / refresh_rate;
+
+	return KGSL_GOVERNOR_CALL_INTERVAL;
+}
 
 /**
  * struct kgsl_midframe_info - midframe power stats sampling info
@@ -86,7 +97,7 @@ void kgsl_pwrscale_wake(struct kgsl_device *device)
 	psc->time = ktime_get();
 
 	psc->next_governor_call = ktime_add_us(psc->time,
-			KGSL_GOVERNOR_CALL_INTERVAL);
+			kgsl_governor_call_interval());
 
 	/* to call devfreq_resume_device() from a kernel thread */
 	queue_work(psc->devfreq_wq, &psc->devfreq_resume_ws);
@@ -161,7 +172,7 @@ void kgsl_pwrscale_update(struct kgsl_device *device)
 		return;
 
 	device->pwrscale.next_governor_call = ktime_add_us(t,
-			KGSL_GOVERNOR_CALL_INTERVAL);
+			kgsl_governor_call_interval());
 
 	/* to call update_devfreq() from a kernel thread */
 	if (device->state != KGSL_STATE_SLUMBER)
@@ -183,7 +194,7 @@ void kgsl_pwrscale_midframe_timer_restart(struct kgsl_device *device)
 				&kgsl_midframe->timer);
 
 		hrtimer_start(&kgsl_midframe->timer,
-				ns_to_ktime(KGSL_GOVERNOR_CALL_INTERVAL
+				ns_to_ktime(kgsl_governor_call_interval()
 					* NSEC_PER_USEC), HRTIMER_MODE_REL);
 	}
 }
@@ -796,7 +807,7 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 				kgsl_pwrscale_midframe_timer_check);
 
 	pwrscale->next_governor_call = ktime_add_us(ktime_get(),
-			KGSL_GOVERNOR_CALL_INTERVAL);
+			kgsl_governor_call_interval());
 
 	/* history tracking */
 	for (i = 0; i < KGSL_PWREVENT_MAX; i++) {
