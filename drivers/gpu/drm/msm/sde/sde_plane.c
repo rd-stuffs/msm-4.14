@@ -3395,6 +3395,11 @@ static void _sde_plane_sspp_atomic_check_mode_changed(struct sde_plane *psde,
 		pstate->dirty |= SDE_PLANE_DIRTY_RECTS;
 	}
 
+	if (rstate->out_rotation != old_rstate->out_rotation) {
+		SDE_DEBUG_PLANE(psde, "rotation change\n");
+		pstate->dirty |= SDE_PLANE_DIRTY_FORMAT;
+	}
+
 	fb = rstate->out_fb;
 	old_fb = old_rstate->out_fb;
 
@@ -4152,8 +4157,7 @@ static int sde_plane_sspp_atomic_update(struct drm_plane *plane,
 					&pstate->line_insertion_cfg);
 	}
 
-	if ((pstate->dirty & SDE_PLANE_DIRTY_FORMAT ||
-			pstate->dirty & SDE_PLANE_DIRTY_RECTS) &&
+	if ((pstate->dirty & SDE_PLANE_DIRTY_FORMAT) &&
 			psde->pipe_hw->ops.setup_format) {
 		SDE_DEBUG_PLANE(psde, "rotation 0x%X\n", rstate->out_rotation);
 		if (rstate->out_rotation & DRM_MODE_REFLECT_X)
