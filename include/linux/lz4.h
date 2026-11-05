@@ -4,6 +4,7 @@
 #ifndef __LINUX_LZ4_H__
 #define __LINUX_LZ4_H__
 
+#define LZ4_STATIC_LINKING_ONLY
 #include "../../lib/lz4/lz4.h"
 #include "../../lib/lz4/lz4hc.h"
 

@@ -956,7 +956,7 @@ LZ4_FORCE_INLINE void LZ4_prepareTable(LZ4_stream_t_internal *const cctx,
 		    ((tableType == byU16) &&
 		     cctx->currentOffset + (unsigned)inputSize >= 0xFFFFU) ||
 		    ((tableType == byU32) && cctx->currentOffset > 1 GB) ||
-		    tableType == byPtr || inputSize >= 4 KB) {
+		    tableType == byPtr || inputSize > 4 KB) {
 			DEBUGLOG(4, "LZ4_prepareTable: Resetting table in %p",
 				 cctx);
 			MEM_INIT(cctx->hashTable, 0, LZ4_HASHTABLESIZE);
@@ -1698,6 +1698,7 @@ int LZ4_compress_fast_extState_fastReset(void *state, const char *src,
 		}
 	}
 }
+EXPORT_SYMBOL(LZ4_compress_fast_extState_fastReset);
 
 int LZ4_compress_fast(const char *src, char *dest, int srcSize, int dstCapacity,
 		      int acceleration, void *wrkmem)
@@ -1834,6 +1835,7 @@ LZ4_stream_t *LZ4_initStream(void *buffer, size_t size)
 	MEM_INIT(buffer, 0, sizeof(LZ4_stream_t_internal));
 	return (LZ4_stream_t *)buffer;
 }
+EXPORT_SYMBOL(LZ4_initStream);
 
 /* resetStream is now deprecated,
  * prefer initStream() which is more general */
