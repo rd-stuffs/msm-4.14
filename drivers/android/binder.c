@@ -4893,12 +4893,10 @@ static int binder_ioctl_write_read(struct file *filp,
 					 &bwr.read_consumed,
 					 filp->f_flags & O_NONBLOCK);
 		trace_binder_read_done(ret);
-		if (!list_empty(&proc->todo)) {
-			binder_inner_proc_lock(proc);
-			if (!binder_worklist_empty_ilocked(&proc->todo))
-				binder_wakeup_proc_ilocked(proc);
-			binder_inner_proc_unlock(proc);
-		}
+		binder_inner_proc_lock(proc);
+		if (!binder_worklist_empty_ilocked(&proc->todo))
+			binder_wakeup_proc_ilocked(proc);
+		binder_inner_proc_unlock(proc);
 		if (ret < 0) {
 			if (copy_to_user(ubuf, &bwr, sizeof(bwr)))
 				ret = -EFAULT;
