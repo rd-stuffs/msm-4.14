@@ -545,9 +545,11 @@ static void binder_wakeup_poll_threads_ilocked(struct binder_proc *proc,
 		if (thread->looper & BINDER_LOOPER_STATE_POLL &&
 		    binder_available_for_proc_work_ilocked(thread)) {
 			if (sync)
-				wake_up_interruptible_sync(&thread->wait);
+				wake_up_interruptible_sync_poll(&thread->wait,
+								POLLIN | POLLRDNORM);
 			else
-				wake_up_interruptible(&thread->wait);
+				wake_up_interruptible_poll(&thread->wait,
+							   POLLIN | POLLRDNORM);
 		}
 	}
 }
@@ -604,9 +606,11 @@ static void binder_wakeup_thread_ilocked(struct binder_proc *proc,
 
 	if (thread) {
 		if (sync)
-			wake_up_interruptible_sync(&thread->wait);
+			wake_up_interruptible_sync_poll(&thread->wait,
+							POLLIN | POLLRDNORM);
 		else
-			wake_up_interruptible(&thread->wait);
+			wake_up_interruptible_poll(&thread->wait,
+						   POLLIN | POLLRDNORM);
 		return;
 	}
 
@@ -1788,7 +1792,8 @@ static void binder_send_failed_reply(struct binder_transaction *t,
 				binder_enqueue_thread_work_ilocked(
 					target_thread,
 					&target_thread->reply_error.work);
-				wake_up_interruptible(&target_thread->wait);
+				wake_up_interruptible_poll(&target_thread->wait,
+							   POLLIN | POLLRDNORM);
 			} else {
 				/*
 				 * Cannot get here for normal operation, but
@@ -3408,7 +3413,8 @@ static void binder_transaction(struct binder_proc *proc,
 		binder_enqueue_thread_work_ilocked(target_thread, &t->work);
 		target_proc->outstanding_txns++;
 		binder_inner_proc_unlock(target_proc);
-		wake_up_interruptible_sync(&target_thread->wait);
+		wake_up_interruptible_sync_poll(&target_thread->wait,
+						POLLIN | POLLRDNORM);
 		binder_restore_priority(current, in_reply_to->saved_priority);
 		binder_free_transaction(in_reply_to);
 	} else if (!(t->flags & TF_ONE_WAY)) {
@@ -4887,10 +4893,12 @@ static int binder_ioctl_write_read(struct file *filp,
 					 &bwr.read_consumed,
 					 filp->f_flags & O_NONBLOCK);
 		trace_binder_read_done(ret);
-		binder_inner_proc_lock(proc);
-		if (!binder_worklist_empty_ilocked(&proc->todo))
-			binder_wakeup_proc_ilocked(proc);
-		binder_inner_proc_unlock(proc);
+		if (!list_empty(&proc->todo)) {
+			binder_inner_proc_lock(proc);
+			if (!binder_worklist_empty_ilocked(&proc->todo))
+				binder_wakeup_proc_ilocked(proc);
+			binder_inner_proc_unlock(proc);
+		}
 		if (ret < 0) {
 			if (copy_to_user(ubuf, &bwr, sizeof(bwr)))
 				ret = -EFAULT;
@@ -5528,7 +5536,8 @@ static void binder_deferred_flush(struct binder_proc *proc)
 
 		thread->looper_need_return = true;
 		if (thread->looper & BINDER_LOOPER_STATE_WAITING) {
-			wake_up_interruptible(&thread->wait);
+			wake_up_interruptible_poll(&thread->wait,
+						   POLLIN | POLLRDNORM);
 			wake_count++;
 		}
 	}
