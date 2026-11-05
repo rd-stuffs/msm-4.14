@@ -21,6 +21,7 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/input/mt.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
@@ -207,21 +208,16 @@ static inline int32_t spi_read_write(struct spi_device *client, uint8_t *buf, si
 {
 	struct spi_message m;
 	struct spi_transfer t = {
-		.len    = len,
+		.tx_buf = ts->xbuf,
 	};
 
-	memcpy(ts->xbuf, buf, len);
-
-	switch (rw) {
-	case NVTREAD:
-		t.tx_buf = ts->xbuf;
+	if (rw == NVTREAD) {
+		ts->xbuf[0] = buf[0];
 		t.rx_buf = ts->rbuf;
-		t.len    = (len + DUMMY_BYTES);
-		break;
-
-	case NVTWRITE:
-		t.tx_buf = ts->xbuf;
-		break;
+		t.len = len + DUMMY_BYTES;
+	} else {
+		memcpy(ts->xbuf, buf, len);
+		t.len = len;
 	}
 
 	spi_message_init(&m);
@@ -238,13 +234,11 @@ return:
 *******************************************************/
 int32_t CTP_SPI_READ(struct spi_device *client, uint8_t *buf, uint16_t len)
 {
-	int32_t ret = -1;
+	int32_t ret;
 
-	mutex_lock(&ts->xbuf_lock);
 	buf[0] = SPI_READ_MASK(buf[0]);
 	ret = spi_read_write(client, buf, len, NVTREAD);
-	memcpy((buf+1), (ts->rbuf+2), (len-1));
-	mutex_unlock(&ts->xbuf_lock);
+	memcpy((buf + 1), (ts->rbuf + 2), (len - 1));
 
 	return ret;
 }
@@ -258,14 +252,8 @@ return:
 *******************************************************/
 int32_t CTP_SPI_WRITE(struct spi_device *client, uint8_t *buf, uint16_t len)
 {
-	int32_t ret = -1;
-
-	mutex_lock(&ts->xbuf_lock);
 	buf[0] = SPI_WRITE_MASK(buf[0]);
-	ret = spi_read_write(client, buf, len, NVTWRITE);
-	mutex_unlock(&ts->xbuf_lock);
-
-	return ret;
+	return spi_read_write(client, buf, len, NVTWRITE);
 }
 
 /*******************************************************
@@ -850,6 +838,44 @@ static const struct file_operations nvt_flash_fops = {
 	.read = nvt_flash_read,
 };
 
+static int nvt_latency_show(struct seq_file *m, void *v)
+{
+	u64 samples = ts->lat_samples;
+	u64 avg_us = samples ? div64_u64(ts->lat_total_us, samples) : 0;
+
+	seq_printf(m, "samples:  %llu\n", samples);
+	seq_printf(m, "last_us:  %u\n", ts->lat_last_us);
+	seq_printf(m, "min_us:   %u\n", ts->lat_min_us);
+	seq_printf(m, "avg_us:   %llu\n", avg_us);
+	seq_printf(m, "max_us:   %u\n", ts->lat_max_us);
+	return 0;
+}
+
+static int nvt_latency_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_latency_show, NULL);
+}
+
+static ssize_t nvt_latency_write(struct file *file, const char __user *buf,
+				 size_t count, loff_t *ppos)
+{
+	ts->lat_samples = 0;
+	ts->lat_last_us = 0;
+	ts->lat_min_us = 0;
+	ts->lat_max_us = 0;
+	ts->lat_total_us = 0;
+	return count;
+}
+
+static const struct file_operations nvt_latency_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_latency_open,
+	.read    = seq_read,
+	.write   = nvt_latency_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
 /*******************************************************
 Description:
 	Novatek touchscreen /proc/NVTSPI initial function.
@@ -867,6 +893,8 @@ static int32_t nvt_flash_proc_init(void)
 		NVT_LOG("Succeeded!\n");
 	}
 
+	proc_create("nvt_latency", 0666, NULL, &nvt_latency_fops);
+
 	NVT_LOG("============================================================\n");
 	NVT_LOG("Create /proc/%s\n", DEVICE_NAME);
 	NVT_LOG("============================================================\n");
@@ -883,6 +911,7 @@ return:
 *******************************************************/
 static void nvt_flash_proc_deinit(void)
 {
+	remove_proc_entry("nvt_latency", NULL);
 	if (NVT_proc_entry != NULL) {
 		remove_proc_entry(DEVICE_NAME, NULL);
 		NVT_proc_entry = NULL;
@@ -1196,6 +1225,7 @@ return:
 static irqreturn_t nvt_ts_work_func(int irq, void *data)
 {
 	struct nvt_ts_data *ts = data;
+	ktime_t t_start = ktime_get();
 
 	int32_t ret = -1;
 	uint8_t point_data[POINT_DATA_LEN + 1 + DUMMY_BYTES] = {0};
@@ -1206,7 +1236,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	uint32_t input_p = 0;
 	uint8_t input_id = 0;
 #if MT_PROTOCOL_B
-	uint8_t press_id[TOUCH_MAX_FINGER_NUM] = {0};
+	unsigned long press_mask = 0;
 #endif /* MT_PROTOCOL_B */
 	int32_t i = 0;
 	int32_t finger_cnt = 0;
@@ -1283,8 +1313,6 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 			input_x = (uint32_t)(point_data[position + 1] << 4) + (uint32_t) (point_data[position + 3] >> 4);
 			input_y = (uint32_t)(point_data[position + 2] << 4) + (uint32_t) (point_data[position + 3] & 0x0F);
-			if ((input_x < 0) || (input_y < 0))
-				continue;
 			if ((input_x > ts->abs_x_max) || (input_y > ts->abs_y_max))
 				continue;
 			input_w = (uint32_t)(point_data[position + 4]);
@@ -1301,7 +1329,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 				input_p = 1;
 
 #if MT_PROTOCOL_B
-			press_id[input_id - 1] = 1;
+			press_mask |= BIT(input_id - 1);
 			input_mt_slot(ts->input_dev, input_id - 1);
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, true);
 #else /* MT_PROTOCOL_B */
@@ -1324,17 +1352,18 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	}
 
 #if MT_PROTOCOL_B
-	for (i = 0; i < ts->max_touch_num; i++) {
-		if (press_id[i]) {
-			ts->active_slots |= BIT(i);
-		} else if (ts->active_slots & BIT(i)) {
-			input_mt_slot(ts->input_dev, i);
+	if (unlikely(ts->active_slots & ~press_mask)) {
+		unsigned long release_mask = ts->active_slots & ~press_mask;
+		int slot;
+
+		for_each_set_bit(slot, &release_mask, ts->max_touch_num) {
+			input_mt_slot(ts->input_dev, slot);
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
 			input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, false);
-			ts->active_slots &= ~BIT(i);
 		}
 	}
+	ts->active_slots = press_mask;
 
 	input_report_key(ts->input_dev, BTN_TOUCH, (finger_cnt > 0));
 #else /* MT_PROTOCOL_B */
@@ -1361,6 +1390,18 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #endif
 
 	input_sync(ts->input_dev);
+
+	{
+		u32 us = (u32)ktime_to_us(ktime_sub(ktime_get(), t_start));
+
+		ts->lat_last_us = us;
+		if (!ts->lat_samples || us < ts->lat_min_us)
+			ts->lat_min_us = us;
+		if (us > ts->lat_max_us)
+			ts->lat_max_us = us;
+		ts->lat_total_us += us;
+		ts->lat_samples++;
+	}
 
 XFER_ERROR:
 
@@ -1679,7 +1720,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 
 	mutex_init(&ts->lock);
-	mutex_init(&ts->xbuf_lock);
 	mutex_init(&ts->reg_lock);
 
 	//---eng reset before TP_RESX high
@@ -1950,7 +1990,6 @@ err_input_register_device_failed:
 	}
 err_input_dev_alloc_failed:
 err_chipvertrim_failed:
-	mutex_destroy(&ts->xbuf_lock);
 	mutex_destroy(&ts->lock);
 	nvt_gpio_deconfig(ts);
 err_gpio_config_failed:
@@ -2033,7 +2072,6 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 	nvt_irq_enable(false);
 	free_irq(client->irq, ts);
 
-	mutex_destroy(&ts->xbuf_lock);
 	mutex_destroy(&ts->lock);
 
 #if WAKEUP_GESTURE

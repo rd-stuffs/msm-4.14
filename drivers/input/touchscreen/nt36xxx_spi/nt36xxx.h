@@ -147,7 +147,11 @@ struct nvt_ts_data {
 	uint16_t nvt_pid;
 	uint8_t rbuf[1025];
 	uint8_t *xbuf;
-	struct mutex xbuf_lock;
+	u64 lat_samples;
+	u32 lat_last_us;
+	u32 lat_min_us;
+	u32 lat_max_us;
+	u64 lat_total_us;
 	bool irq_enabled;
 #if WAKEUP_GESTURE
 	bool delay_gesture;
