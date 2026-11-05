@@ -758,7 +758,11 @@ response_time_ms_store(struct gov_attr_set *attr_set, const char *buf, size_t co
 	if (kstrtouint(buf, 10, &response_time_ms) || !response_time_ms)
 		return -EINVAL;
 
-	/* XXX need special handling for high values? */
+	list_for_each_entry(sg_policy, &attr_set->policy_list, tunables_hook) {
+		if (sg_policy->tunables == tunables &&
+		    !cpumask_test_cpu(sg_policy->policy->cpu, cpu_lp_mask))
+			response_time_ms = min(response_time_ms, 10U);
+	}
 
 	tunables->response_time_ms = response_time_ms;
 
@@ -959,7 +963,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 	tunables->rate_limit_us = 2000;
 	tunables->response_time_ms = cpumask_test_cpu(policy->cpu, cpu_lp_mask) ?
 		sugov_calc_freq_response_ms(sg_policy) :
-		min_t(u64, 30, sugov_calc_freq_response_ms(sg_policy));
+		min_t(u64, 10, sugov_calc_freq_response_ms(sg_policy));
 	sugov_update_response_time_mult(sg_policy);
 	sugov_build_dvfs_headroom_lut(sg_policy);
 
