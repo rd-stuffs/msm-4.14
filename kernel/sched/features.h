@@ -10,7 +10,7 @@
  * Place new tasks ahead so that they do not starve already running
  * tasks
  */
-#define SCHED_FEAT_START_DEBIT 1
+#define SCHED_FEAT_START_DEBIT 0
 
 /*
  * Prefer to schedule the task we woke last (assuming it failed
