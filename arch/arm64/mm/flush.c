@@ -100,3 +100,25 @@ void arch_invalidate_pmem(void *addr, size_t size)
 }
 EXPORT_SYMBOL_GPL(arch_invalidate_pmem);
 #endif
+
+int ptep_clear_flush_young(struct vm_area_struct *vma,
+			   unsigned long address, pte_t *ptep)
+{
+	int young;
+
+	young = ptep_test_and_clear_young(vma, address, ptep);
+	if (young)
+		flush_tlb_page_nosync(vma, address);
+
+	return young;
+}
+EXPORT_SYMBOL(ptep_clear_flush_young);
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+int pmdp_clear_flush_young(struct vm_area_struct *vma,
+			   unsigned long address, pmd_t *pmdp)
+{
+	return ptep_clear_flush_young(vma, address, (pte_t *)pmdp);
+}
+EXPORT_SYMBOL(pmdp_clear_flush_young);
+#endif
