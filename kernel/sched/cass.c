@@ -87,11 +87,22 @@ bool cass_prime_cpu(const struct cass_cpu_cand *c)
 	       arch_scale_cpu_capacity(NULL, nr_cpu_ids - 2) != SCHED_CAPACITY_SCALE;
 }
 
+/*
+ * Returns true if @c is a CPU with the maximum possible original capacity
+ * in an asymmetric capacity system (i.e., if @c belongs to the big CPU cluster).
+ */
+static __always_inline
+bool cass_big_cpu(const struct cass_cpu_cand *c)
+{
+	return c->cap_max == SCHED_CAPACITY_SCALE &&
+	       arch_scale_cpu_capacity(NULL, 0) != SCHED_CAPACITY_SCALE;
+}
+
 /* Returns true if @a is a better CPU than @b */
 static __always_inline
 bool cass_cpu_better(const struct cass_cpu_cand *a,
 		     const struct cass_cpu_cand *b, unsigned long p_util,
-		     int this_cpu, int prev_cpu, bool sync)
+		     int this_cpu, int prev_cpu, bool sync, bool prefer_idle)
 {
 #define cass_cmp(a, b) ({ res = (a) - (b); })
 #define cass_eq(a, b) ({ res = (a) == (b); })
@@ -114,6 +125,14 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 
 	/* Prefer the CPU that isn't the single fastest one in the system */
 	if (cass_cmp(cass_prime_cpu(b), cass_prime_cpu(a)))
+		goto done;
+
+	/*
+	 * For unboosted tasks that fit on little CPUs, prefer the little CPU
+	 * over the big CPU cluster to keep big CPUs available for latency-sensitive
+	 * work and heavy tasks.
+	 */
+	if (!prefer_idle && cass_cmp(cass_big_cpu(b), cass_big_cpu(a)))
 		goto done;
 
 	/* Prefer the CPU with lower relative utilization */
@@ -151,6 +170,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	/* Initialize @best such that @best always has a valid CPU at the end */
 	struct cass_cpu_cand cands[2], *best = NULL;
 	int this_cpu = raw_smp_processor_id();
+	bool prefer_idle = !rt && schedtune_prefer_idle(p) > 0;
 	unsigned long p_util;
 	bool has_idle = false;
 	int cidx = 0, cpu;
@@ -193,14 +213,8 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 			 * A non-idle candidate may be better for energy
 			 * efficiency when the only idle candidate found so far
 			 * is the prime CPU. Otherwise, prefer idle candidates.
-			 * Tasks from prefer-idle cgroups (e.g. top-app) skip
-			 * the size gate so latency-sensitive work lands on an
-			 * idle CPU immediately instead of balancing.
 			 */
-			if (!has_idle &&
-			    (schedtune_prefer_idle(p) > 0 ||
-			     p_util <= arch_scale_min_freq_capacity(cpu)) &&
-			    !cass_prime_cpu(curr)) {
+			if (!has_idle && !cass_prime_cpu(curr)) {
 				/* Discard any previous non-idle candidate */
 				best = curr;
 				has_idle = true;
@@ -257,7 +271,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		 */
 		if (!best || best == curr ||
 		    cass_cpu_better(curr, best, p_util, this_cpu, prev_cpu,
-				    sync)) {
+				    sync, prefer_idle)) {
 			best = curr;
 			cidx ^= 1;
 		}
