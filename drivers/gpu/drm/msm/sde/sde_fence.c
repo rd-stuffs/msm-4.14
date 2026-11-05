@@ -321,7 +321,6 @@ static void _sde_fence_trigger(struct sde_fence_context *ctx,
 {
 	unsigned long flags;
 	struct sde_fence *fc, *next;
-	bool is_signaled = false;
 	struct list_head local_list_head;
 
 	INIT_LIST_HEAD(&local_list_head);
@@ -333,11 +332,12 @@ static void _sde_fence_trigger(struct sde_fence_context *ctx,
 		return;
 	}
 
-	list_for_each_entry_safe(fc, next, &ctx->fence_list_head, fence_list)
-		list_move(&fc->fence_list, &local_list_head);
+	list_splice_init(&ctx->fence_list_head, &local_list_head);
 	spin_unlock(&ctx->list_lock);
 
 	list_for_each_entry_safe(fc, next, &local_list_head, fence_list) {
+		bool is_signaled;
+
 		spin_lock_irqsave(&ctx->lock, flags);
 		fc->base.error = error ? -EBUSY : 0;
 		fc->base.timestamp = ts;
@@ -347,11 +347,13 @@ static void _sde_fence_trigger(struct sde_fence_context *ctx,
 		if (is_signaled) {
 			list_del_init(&fc->fence_list);
 			dma_fence_put(&fc->base);
-		} else {
-			spin_lock(&ctx->list_lock);
-			list_move(&fc->fence_list, &ctx->fence_list_head);
-			spin_unlock(&ctx->list_lock);
 		}
+	}
+
+	if (!list_empty(&local_list_head)) {
+		spin_lock(&ctx->list_lock);
+		list_splice_init(&local_list_head, &ctx->fence_list_head);
+		spin_unlock(&ctx->list_lock);
 	}
 }
 
