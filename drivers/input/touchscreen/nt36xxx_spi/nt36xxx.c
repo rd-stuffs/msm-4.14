@@ -412,6 +412,38 @@ static int32_t nvt_send_host_cmd(struct nvt_ts_data *ts, uint8_t cmd,
 	return ret;
 }
 
+static bool nvt_charger_connected;
+
+static void nvt_ts_charger_work_func(struct work_struct *work)
+{
+	struct nvt_ts_data *ts_data = container_of(work, struct nvt_ts_data, charger_work);
+	uint8_t cmd;
+
+	if (!ts_data || !bTouchIsAwake)
+		return;
+
+	cmd = ts_data->charger_plugged ? 0x53 : 0x51;
+
+	mutex_lock(&ts_data->lock);
+	nvt_send_host_cmd(ts_data, cmd, NULL, 0);
+	mutex_unlock(&ts_data->lock);
+}
+
+void nvt_set_charger_mode(bool plugged_in)
+{
+	nvt_charger_connected = plugged_in;
+
+	if (!ts)
+		return;
+
+	if (ts->charger_plugged == plugged_in)
+		return;
+
+	ts->charger_plugged = plugged_in;
+	schedule_work(&ts->charger_work);
+}
+EXPORT_SYMBOL_GPL(nvt_set_charger_mode);
+
 static void nvt_apply_gaming_defaults(struct nvt_ts_data *ts)
 {
 	uint8_t arg;
@@ -440,6 +472,12 @@ static void nvt_apply_gaming_defaults(struct nvt_ts_data *ts)
 	/* 4. Edge filter rejection: 0x72 (0 = zero edge deadzones) */
 	arg = (uint8_t)nvt_edge_filter;
 	nvt_send_host_cmd(ts, 0x72, &arg, 1);
+
+	/* 5. Charger AC noise immunity mode: 0x53 = on, 0x51 = off */
+	if (ts->charger_plugged) {
+		usleep_range(1000, 2000);
+		nvt_send_host_cmd(ts, 0x53, NULL, 0);
+	}
 }
 
 /*******************************************************
@@ -1214,6 +1252,46 @@ static const struct file_operations nvt_er_range_switch_fops = {
 	.release = single_release,
 };
 
+static int nvt_charger_mode_show(struct seq_file *m, void *v)
+{
+	bool plugged = ts ? ts->charger_plugged : nvt_charger_connected;
+
+	seq_printf(m, "%d\n", plugged ? 1 : 0);
+	return 0;
+}
+
+static int nvt_charger_mode_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_charger_mode_show, NULL);
+}
+
+static ssize_t nvt_charger_mode_write(struct file *file, const char __user *buf,
+				      size_t count, loff_t *ppos)
+{
+	char kbuf[16];
+	int val;
+
+	if (count >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, buf, count))
+		return -EFAULT;
+	kbuf[count] = '\0';
+	if (kstrtoint(strstrip(kbuf), 10, &val))
+		return -EINVAL;
+
+	nvt_set_charger_mode(val != 0);
+	return count;
+}
+
+static const struct file_operations nvt_charger_mode_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_charger_mode_open,
+	.read    = seq_read,
+	.write   = nvt_charger_mode_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
 /*******************************************************
 Description:
 	Novatek touchscreen /proc/NVTSPI initial function.
@@ -1237,6 +1315,7 @@ static int32_t nvt_flash_proc_init(void)
 	proc_create("nvt_pf_switch", 0666, NULL, &nvt_pf_switch_fops);
 	proc_create("nvt_sensitivity_switch", 0666, NULL, &nvt_sensitivity_switch_fops);
 	proc_create("nvt_er_range_switch", 0666, NULL, &nvt_er_range_switch_fops);
+	proc_create("nvt_charger_mode", 0666, NULL, &nvt_charger_mode_fops);
 
 	NVT_LOG("============================================================\n");
 	NVT_LOG("Create /proc/%s\n", DEVICE_NAME);
@@ -1254,6 +1333,7 @@ return:
 *******************************************************/
 static void nvt_flash_proc_deinit(void)
 {
+	remove_proc_entry("nvt_charger_mode", NULL);
 	remove_proc_entry("nvt_er_range_switch", NULL);
 	remove_proc_entry("nvt_sensitivity_switch", NULL);
 	remove_proc_entry("nvt_pf_switch", NULL);
@@ -2263,6 +2343,9 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
 
+	INIT_WORK(&ts->charger_work, nvt_ts_charger_work_func);
+	ts->charger_plugged = nvt_charger_connected;
+
 	nvt_irq_enable(true);
 
 	mutex_lock(&ts->lock);
@@ -2378,6 +2461,8 @@ return:
 static int32_t nvt_ts_remove(struct spi_device *client)
 {
 	NVT_LOG("Removing driver...\n");
+
+	cancel_work_sync(&ts->charger_work);
 
 #if defined(CONFIG_FB)
 	if (ts->workqueue)

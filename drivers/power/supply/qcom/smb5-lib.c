@@ -34,6 +34,7 @@
 #ifdef CONFIG_REVERSE_CHARGE
 #include <linux/gpio.h>
 #endif
+#include <linux/input/nt36xxx.h>
 
 #define smblib_err(chg, fmt, ...)		\
 	pr_err("%s: %s: " fmt, chg->name,	\
@@ -6482,6 +6483,7 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 		dual_role_instance_changed(chg->dual_role);
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: usbin-plugin %s\n",
 					vbus_rising ? "attached" : "detached");
+	nvt_set_charger_mode(vbus_rising);
 }
 
 irqreturn_t usb_plugin_irq_handler(int irq, void *data)
