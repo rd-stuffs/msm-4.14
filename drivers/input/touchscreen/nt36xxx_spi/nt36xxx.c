@@ -128,15 +128,30 @@ static uint8_t bTouchIsAwake;
 #ifdef CONFIG_TOUCHSCREEN_NT36xxx_GAMING_DEFAULTS
 static int nvt_high_rate = 1;
 static int nvt_gaming_mode = 1;
+static int nvt_point_filter = 1;
+static int nvt_sensitivity = 1;
+static int nvt_edge_filter = 0;
 #else
 static int nvt_high_rate;
 static int nvt_gaming_mode;
+static int nvt_point_filter;
+static int nvt_sensitivity;
+static int nvt_edge_filter = 2;
 #endif
 module_param_named(high_rate, nvt_high_rate, int, 0644);
 MODULE_PARM_DESC(high_rate, "Enable 240 Hz touch sampling rate (1=240 Hz, 0=120 Hz)");
 
 module_param_named(gaming_mode, nvt_gaming_mode, int, 0644);
 MODULE_PARM_DESC(gaming_mode, "Enable gaming touch sensitivity and 1:1 aiming (1=enabled, 0=default)");
+
+module_param_named(point_filter, nvt_point_filter, int, 0644);
+MODULE_PARM_DESC(point_filter, "Point filter jitter smoothing level (1=1:1 aim, 0=default)");
+
+module_param_named(sensitivity, nvt_sensitivity, int, 0644);
+MODULE_PARM_DESC(sensitivity, "Touch up/hover sensitivity threshold (1=instant, 0=default)");
+
+module_param_named(edge_filter, nvt_edge_filter, int, 0644);
+MODULE_PARM_DESC(edge_filter, "Edge rejection deadzone range (0=none, 1=small, 2=medium, 3=large)");
 
 #if WAKEUP_GESTURE
 #define WAKEUP_OFF 4
@@ -412,21 +427,19 @@ static void nvt_apply_gaming_defaults(struct nvt_ts_data *ts)
 
 	usleep_range(1000, 2000);
 
-	/* 2. Jitter filter: 0x70 with 0x01 = minimal smoothing for 1:1 pixel aiming */
-	if (nvt_gaming_mode) {
-		arg = 0x01;
-		nvt_send_host_cmd(ts, 0x70, &arg, 1);
-		usleep_range(1000, 2000);
+	/* 2. Jitter filter: 0x70 (1 = minimal smoothing for 1:1 pixel aiming) */
+	arg = (uint8_t)nvt_point_filter;
+	nvt_send_host_cmd(ts, 0x70, &arg, 1);
+	usleep_range(1000, 2000);
 
-		/* 3. Up/hover threshold: 0x71 with 0x01 = instant light-touch registration */
-		arg = 0x01;
-		nvt_send_host_cmd(ts, 0x71, &arg, 1);
-		usleep_range(1000, 2000);
+	/* 3. Up/hover threshold: 0x71 (1 = instant light-touch registration) */
+	arg = (uint8_t)nvt_sensitivity;
+	nvt_send_host_cmd(ts, 0x71, &arg, 1);
+	usleep_range(1000, 2000);
 
-		/* 4. Edge filter rejection: 0x72 with 0x00 = zero edge deadzones */
-		arg = 0x00;
-		nvt_send_host_cmd(ts, 0x72, &arg, 1);
-	}
+	/* 4. Edge filter rejection: 0x72 (0 = zero edge deadzones) */
+	arg = (uint8_t)nvt_edge_filter;
+	nvt_send_host_cmd(ts, 0x72, &arg, 1);
 }
 
 /*******************************************************
@@ -949,11 +962,13 @@ static const struct file_operations nvt_latency_fops = {
 
 static int nvt_gaming_show(struct seq_file *m, void *v)
 {
+	seq_printf(m, "%d\n", nvt_gaming_mode);
 	seq_printf(m, "touch_sampling_rate: %s (cmd 0x%02X)\n",
 		   nvt_high_rate ? "240 Hz" : "120 Hz",
 		   nvt_high_rate ? 0x75 : 0x76);
-	seq_printf(m, "gaming_mode: %s (1:1 aim jitter=0x70:01, sensitivity=0x71:01, edge_filter=0x72:00)\n",
-		   nvt_gaming_mode ? "enabled" : "disabled");
+	seq_printf(m, "gaming_mode: %s (point_filter=0x70:%02X, sensitivity=0x71:%02X, edge_filter=0x72:%02X)\n",
+		   nvt_gaming_mode ? "enabled" : "disabled",
+		   nvt_point_filter, nvt_sensitivity, nvt_edge_filter);
 	return 0;
 }
 
@@ -985,9 +1000,15 @@ static ssize_t nvt_gaming_write(struct file *file, const char __user *buf,
 	if (val == 240 || val == 1) {
 		nvt_high_rate = 1;
 		nvt_gaming_mode = 1;
+		nvt_point_filter = 1;
+		nvt_sensitivity = 1;
+		nvt_edge_filter = 0;
 	} else if (val == 120 || val == 0) {
 		nvt_high_rate = 0;
 		nvt_gaming_mode = 0;
+		nvt_point_filter = 0;
+		nvt_sensitivity = 0;
+		nvt_edge_filter = 2;
 	}
 	nvt_apply_gaming_defaults(ts);
 	mutex_unlock(&ts->lock);
@@ -1000,6 +1021,195 @@ static const struct file_operations nvt_gaming_fops = {
 	.open    = nvt_gaming_open,
 	.read    = seq_read,
 	.write   = nvt_gaming_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+static int nvt_high_rate_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", nvt_high_rate ? 1 : 0);
+	return 0;
+}
+
+static int nvt_high_rate_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_high_rate_show, NULL);
+}
+
+static ssize_t nvt_high_rate_write(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	char kbuf[16];
+	int val;
+
+	if (count >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, buf, count))
+		return -EFAULT;
+	kbuf[count] = '\0';
+	if (kstrtoint(strstrip(kbuf), 10, &val))
+		return -EINVAL;
+
+	if (!ts)
+		return -ENODEV;
+
+	mutex_lock(&ts->lock);
+	nvt_high_rate = (val == 240 || val == 1) ? 1 : 0;
+	if (nvt_high_rate)
+		nvt_send_host_cmd(ts, 0x75, NULL, 0);
+	else
+		nvt_send_host_cmd(ts, 0x76, NULL, 0);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static const struct file_operations nvt_high_rate_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_high_rate_open,
+	.read    = seq_read,
+	.write   = nvt_high_rate_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+static int nvt_pf_switch_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", nvt_point_filter);
+	return 0;
+}
+
+static int nvt_pf_switch_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_pf_switch_show, NULL);
+}
+
+static ssize_t nvt_pf_switch_write(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	char kbuf[16];
+	int val;
+	uint8_t arg;
+
+	if (count >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, buf, count))
+		return -EFAULT;
+	kbuf[count] = '\0';
+	if (kstrtoint(strstrip(kbuf), 10, &val))
+		return -EINVAL;
+
+	if (!ts)
+		return -ENODEV;
+
+	mutex_lock(&ts->lock);
+	nvt_point_filter = val;
+	arg = (uint8_t)val;
+	nvt_send_host_cmd(ts, 0x70, &arg, 1);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static const struct file_operations nvt_pf_switch_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_pf_switch_open,
+	.read    = seq_read,
+	.write   = nvt_pf_switch_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+static int nvt_sensitivity_switch_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", nvt_sensitivity);
+	return 0;
+}
+
+static int nvt_sensitivity_switch_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_sensitivity_switch_show, NULL);
+}
+
+static ssize_t nvt_sensitivity_switch_write(struct file *file, const char __user *buf,
+					    size_t count, loff_t *ppos)
+{
+	char kbuf[16];
+	int val;
+	uint8_t arg;
+
+	if (count >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, buf, count))
+		return -EFAULT;
+	kbuf[count] = '\0';
+	if (kstrtoint(strstrip(kbuf), 10, &val))
+		return -EINVAL;
+
+	if (!ts)
+		return -ENODEV;
+
+	mutex_lock(&ts->lock);
+	nvt_sensitivity = val;
+	arg = (uint8_t)val;
+	nvt_send_host_cmd(ts, 0x71, &arg, 1);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static const struct file_operations nvt_sensitivity_switch_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_sensitivity_switch_open,
+	.read    = seq_read,
+	.write   = nvt_sensitivity_switch_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+static int nvt_er_range_switch_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", nvt_edge_filter);
+	return 0;
+}
+
+static int nvt_er_range_switch_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_er_range_switch_show, NULL);
+}
+
+static ssize_t nvt_er_range_switch_write(struct file *file, const char __user *buf,
+					 size_t count, loff_t *ppos)
+{
+	char kbuf[16];
+	int val;
+	uint8_t arg;
+
+	if (count >= sizeof(kbuf))
+		return -EINVAL;
+	if (copy_from_user(kbuf, buf, count))
+		return -EFAULT;
+	kbuf[count] = '\0';
+	if (kstrtoint(strstrip(kbuf), 10, &val))
+		return -EINVAL;
+
+	if (!ts)
+		return -ENODEV;
+
+	mutex_lock(&ts->lock);
+	nvt_edge_filter = val;
+	arg = (uint8_t)val;
+	nvt_send_host_cmd(ts, 0x72, &arg, 1);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static const struct file_operations nvt_er_range_switch_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_er_range_switch_open,
+	.read    = seq_read,
+	.write   = nvt_er_range_switch_write,
 	.llseek  = seq_lseek,
 	.release = single_release,
 };
@@ -1023,6 +1233,10 @@ static int32_t nvt_flash_proc_init(void)
 
 	proc_create("nvt_latency", 0666, NULL, &nvt_latency_fops);
 	proc_create("nvt_gaming", 0666, NULL, &nvt_gaming_fops);
+	proc_create("nvt_high_rate", 0666, NULL, &nvt_high_rate_fops);
+	proc_create("nvt_pf_switch", 0666, NULL, &nvt_pf_switch_fops);
+	proc_create("nvt_sensitivity_switch", 0666, NULL, &nvt_sensitivity_switch_fops);
+	proc_create("nvt_er_range_switch", 0666, NULL, &nvt_er_range_switch_fops);
 
 	NVT_LOG("============================================================\n");
 	NVT_LOG("Create /proc/%s\n", DEVICE_NAME);
@@ -1040,6 +1254,10 @@ return:
 *******************************************************/
 static void nvt_flash_proc_deinit(void)
 {
+	remove_proc_entry("nvt_er_range_switch", NULL);
+	remove_proc_entry("nvt_sensitivity_switch", NULL);
+	remove_proc_entry("nvt_pf_switch", NULL);
+	remove_proc_entry("nvt_high_rate", NULL);
 	remove_proc_entry("nvt_gaming", NULL);
 	remove_proc_entry("nvt_latency", NULL);
 	if (NVT_proc_entry != NULL) {
