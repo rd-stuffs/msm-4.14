@@ -125,6 +125,19 @@ const uint16_t gesture_key_array[] = {
 
 static uint8_t bTouchIsAwake;
 
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_GAMING_DEFAULTS
+static int nvt_high_rate = 1;
+static int nvt_gaming_mode = 1;
+#else
+static int nvt_high_rate;
+static int nvt_gaming_mode;
+#endif
+module_param_named(high_rate, nvt_high_rate, int, 0644);
+MODULE_PARM_DESC(high_rate, "Enable 240 Hz touch sampling rate (1=240 Hz, 0=120 Hz)");
+
+module_param_named(gaming_mode, nvt_gaming_mode, int, 0644);
+MODULE_PARM_DESC(gaming_mode, "Enable gaming touch sensitivity and 1:1 aiming (1=enabled, 0=default)");
+
 #if WAKEUP_GESTURE
 #define WAKEUP_OFF 4
 #define WAKEUP_ON 5
@@ -356,6 +369,64 @@ void nvt_fw_crc_enable(void)
 	buf[0] = EVENT_MAP_HOST_CMD & (0x7F);
 	buf[1] = 0xAE;	//enable fw crc command
 	CTP_SPI_WRITE(ts->client, buf, 2);
+}
+
+static int32_t nvt_send_host_cmd(struct nvt_ts_data *ts, uint8_t cmd,
+				 const uint8_t *args, uint16_t arg_len)
+{
+	uint8_t buf[4] = {0};
+	int32_t ret;
+
+	if (!ts || !ts->mmap)
+		return -EINVAL;
+
+	if (arg_len > 2)
+		arg_len = 2;
+
+	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
+	if (ret < 0)
+		return ret;
+
+	buf[0] = EVENT_MAP_HOST_CMD;
+	buf[1] = cmd;
+	if (arg_len > 0 && args)
+		memcpy(&buf[2], args, arg_len);
+
+	ret = CTP_SPI_WRITE(ts->client, buf, 2 + arg_len);
+	nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+	return ret;
+}
+
+static void nvt_apply_gaming_defaults(struct nvt_ts_data *ts)
+{
+	uint8_t arg;
+
+	if (!ts || !bTouchIsAwake)
+		return;
+
+	/* 1. Touch sampling rate: 0x75 = 240 Hz (Max Power Mode), 0x76 = 120 Hz */
+	if (nvt_high_rate)
+		nvt_send_host_cmd(ts, 0x75, NULL, 0);
+	else
+		nvt_send_host_cmd(ts, 0x76, NULL, 0);
+
+	usleep_range(1000, 2000);
+
+	/* 2. Jitter filter: 0x70 with 0x01 = minimal smoothing for 1:1 pixel aiming */
+	if (nvt_gaming_mode) {
+		arg = 0x01;
+		nvt_send_host_cmd(ts, 0x70, &arg, 1);
+		usleep_range(1000, 2000);
+
+		/* 3. Up/hover threshold: 0x71 with 0x01 = instant light-touch registration */
+		arg = 0x01;
+		nvt_send_host_cmd(ts, 0x71, &arg, 1);
+		usleep_range(1000, 2000);
+
+		/* 4. Edge filter rejection: 0x72 with 0x00 = zero edge deadzones */
+		arg = 0x00;
+		nvt_send_host_cmd(ts, 0x72, &arg, 1);
+	}
 }
 
 /*******************************************************
@@ -876,10 +947,67 @@ static const struct file_operations nvt_latency_fops = {
 	.release = single_release,
 };
 
+static int nvt_gaming_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "touch_sampling_rate: %s (cmd 0x%02X)\n",
+		   nvt_high_rate ? "240 Hz" : "120 Hz",
+		   nvt_high_rate ? 0x75 : 0x76);
+	seq_printf(m, "gaming_mode: %s (1:1 aim jitter=0x70:01, sensitivity=0x71:01, edge_filter=0x72:00)\n",
+		   nvt_gaming_mode ? "enabled" : "disabled");
+	return 0;
+}
+
+static int nvt_gaming_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_gaming_show, NULL);
+}
+
+static ssize_t nvt_gaming_write(struct file *file, const char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	char kbuf[32];
+	int val;
+
+	if (count >= sizeof(kbuf))
+		return -EINVAL;
+
+	if (copy_from_user(kbuf, buf, count))
+		return -EFAULT;
+
+	kbuf[count] = '\0';
+	if (kstrtoint(strstrip(kbuf), 10, &val))
+		return -EINVAL;
+
+	if (!ts)
+		return -ENODEV;
+
+	mutex_lock(&ts->lock);
+	if (val == 240 || val == 1) {
+		nvt_high_rate = 1;
+		nvt_gaming_mode = 1;
+	} else if (val == 120 || val == 0) {
+		nvt_high_rate = 0;
+		nvt_gaming_mode = 0;
+	}
+	nvt_apply_gaming_defaults(ts);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static const struct file_operations nvt_gaming_fops = {
+	.owner   = THIS_MODULE,
+	.open    = nvt_gaming_open,
+	.read    = seq_read,
+	.write   = nvt_gaming_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
 /*******************************************************
 Description:
 	Novatek touchscreen /proc/NVTSPI initial function.
-
+ 
 return:
 	Executive outcomes. 0---succeed. -12---failed.
 *******************************************************/
@@ -894,6 +1022,7 @@ static int32_t nvt_flash_proc_init(void)
 	}
 
 	proc_create("nvt_latency", 0666, NULL, &nvt_latency_fops);
+	proc_create("nvt_gaming", 0666, NULL, &nvt_gaming_fops);
 
 	NVT_LOG("============================================================\n");
 	NVT_LOG("Create /proc/%s\n", DEVICE_NAME);
@@ -911,6 +1040,7 @@ return:
 *******************************************************/
 static void nvt_flash_proc_deinit(void)
 {
+	remove_proc_entry("nvt_gaming", NULL);
 	remove_proc_entry("nvt_latency", NULL);
 	if (NVT_proc_entry != NULL) {
 		remove_proc_entry(DEVICE_NAME, NULL);
@@ -1917,6 +2047,10 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 	nvt_irq_enable(true);
 
+	mutex_lock(&ts->lock);
+	nvt_apply_gaming_defaults(ts);
+	mutex_unlock(&ts->lock);
+
 #ifdef CONFIG_PM
 	ts->dev_pm_suspend = false;
 	init_completion(&ts->dev_pm_suspend_completion);
@@ -2300,6 +2434,7 @@ static int32_t nvt_ts_resume(struct device *dev)
 	bTouchIsAwake = 1;
 	ts->active_slots = 0;
 	NVT_LOG("bTouchIsAwake = 1\n");
+	nvt_apply_gaming_defaults(ts);
 	mutex_unlock(&ts->lock);
 
 #if WAKEUP_GESTURE

@@ -10,3 +10,13 @@ config TOUCHSCREEN_NT36xxx_HOSTDL_SPI
 	  to your system by SPI bus.
 
 	  If unsure, say N.
+
+config TOUCHSCREEN_NT36xxx_GAMING_DEFAULTS
+	bool "Enable 240 Hz touch sampling and 1:1 gaming sensitivity by default"
+	depends on TOUCHSCREEN_NT36xxx_HOSTDL_SPI
+	default y
+	help
+	  When enabled, configures the Novatek NT36xxx touchscreen controller
+	  to scan at 240 Hz (Max Power Mode, 4.16 ms scan interval) and
+	  applies 1:1 raw aiming jitter filtering and instant touch sensitivity
+	  on boot and resume.
