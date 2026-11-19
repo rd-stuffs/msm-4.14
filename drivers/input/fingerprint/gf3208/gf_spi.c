@@ -84,7 +84,7 @@ static inline void irq_switch(struct gf_dev *gf_dev, int status) {
 	}
 }
 
-#define WAKELOCK_HOLD_TIME 400
+#define WAKELOCK_HOLD_TIME 2000
 static inline irqreturn_t gf_irq(int irq, void *handle) {
 	struct gf_dev *gf_dev = handle;
 
