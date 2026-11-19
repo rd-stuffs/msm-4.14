@@ -152,15 +152,6 @@ static bool sugov_update_next_freq(struct sugov_policy *sg_policy, u64 time,
 		 */
 		if (cpufreq_driver_test_flags(CPUFREQ_NEED_UPDATE_LIMITS))
 			goto must_update;
-		/*
-		 * Even if the driver doesn't require notification on every
-		 * limits update, we still need to update our internal state
-		 * to reflect the new limits and avoid rate limiting blocking
-		 * future updates. Return false to skip the driver callback.
-		 */
-		sg_policy->next_freq = next_freq;
-		sg_policy->last_freq_update_time = time;
-		return false;
 	}
 
 	/*
@@ -1064,29 +1055,43 @@ static void sugov_stop(struct cpufreq_policy *policy)
 static void sugov_limits(struct cpufreq_policy *policy)
 {
 	struct sugov_policy *sg_policy = policy->governor_data;
-	unsigned long flags, now;
+	unsigned long flags;
 	unsigned int freq;
+	u64 now;
 
 	if (!policy->fast_switch_enabled) {
 		mutex_lock(&sg_policy->work_lock);
 		cpufreq_policy_apply_limits(policy);
 		mutex_unlock(&sg_policy->work_lock);
+		WRITE_ONCE(sg_policy->limits_changed, true);
 	} else {
 		raw_spin_lock_irqsave(&sg_policy->update_lock, flags);
-		freq = policy->cur;
-		now = ktime_get_ns();
+#ifdef CONFIG_SCHED_WALT
+		now = sched_ktime_clock();
+#else
+		now = sched_clock();
+#endif
+		sg_policy->cached_raw_freq = 0;
+		if (policy_is_shared(policy))
+			freq = sugov_next_freq_shared(
+					&per_cpu(sugov_cpu, policy->cpu), now);
+		else
+			freq = cpufreq_driver_resolve_freq(policy, policy->cur);
 
-		/*
-		 * cpufreq_driver_resolve_freq() has a clamp, so we do not need
-		 * to do any sort of additional validation here.
-		 */
-		freq = cpufreq_driver_resolve_freq(policy, freq);
-		sg_policy->cached_raw_freq = freq;
-		sugov_fast_switch(sg_policy, now, freq);
+		if (freq != policy->cur ||
+		    cpufreq_driver_test_flags(CPUFREQ_NEED_UPDATE_LIMITS)) {
+			freq = cpufreq_driver_fast_switch(policy, freq);
+			if (freq) {
+				policy->cur = freq;
+				sg_policy->next_freq = freq;
+				sg_policy->last_freq_update_time = now;
+			}
+		} else {
+			sg_policy->next_freq = freq;
+		}
+		WRITE_ONCE(sg_policy->limits_changed, false);
 		raw_spin_unlock_irqrestore(&sg_policy->update_lock, flags);
 	}
-
-	WRITE_ONCE(sg_policy->limits_changed, true);
 }
 
 static struct cpufreq_governor schedutil_gov = {
