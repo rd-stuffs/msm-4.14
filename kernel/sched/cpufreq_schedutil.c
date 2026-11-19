@@ -430,13 +430,10 @@ sugov_apply_response_time(unsigned long util, int cpu)
 	return mult >> SCHED_CAPACITY_SHIFT;
 }
 
-static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
-			   u64 time)
+static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu)
 {
-	struct rq *rq = cpu_rq(cpu);
-	unsigned long max_cap, rt;
+	unsigned long max_cap;
 	struct sugov_cpu *loadcpu = &per_cpu(sugov_cpu, cpu);
-	s64 delta;
 
 	max_cap = arch_scale_cpu_capacity(NULL, cpu);
 	*max = max_cap;
@@ -444,18 +441,14 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 	if (likely(use_pelt())) {
 		unsigned long raw_util = cpu_util_freq(cpu, &loadcpu->walt_load);
 
-		sched_avg_update(rq);
-		delta = time - rq->age_stamp;
-		if (unlikely(delta < 0))
-			delta = 0;
-		rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
-		rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
 		/*
-		 * Scale PELT utilization by response time before adding the
-		 * instantaneous SchedTune margin so boost headroom isn't
-		 * amplified by response_time_mult on high-capacity clusters.
+		 * cpu_util_freq() already includes PELT RT utilization via
+		 * cpu_util_rt(). Scale PELT utilization by response time before
+		 * adding the instantaneous SchedTune margin so boost headroom
+		 * isn't amplified by response_time_mult on high-capacity
+		 * clusters.
 		 */
-		raw_util = min(sugov_apply_response_time(raw_util + rt, cpu), max_cap);
+		raw_util = min(sugov_apply_response_time(raw_util, cpu), max_cap);
 		raw_util = min(schedtune_apply_cpu_margin(raw_util, cpu), max_cap);
 		*util = min(sugov_apply_dvfs_headroom(raw_util, cpu), max_cap);
 	} else {
@@ -568,7 +561,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		sg_policy->cached_raw_freq = 0;
 		next_f = policy->cpuinfo.max_freq;
 	} else {
-		sugov_get_util(&util, &max, sg_cpu->cpu, time);
+		sugov_get_util(&util, &max, sg_cpu->cpu);
 		sugov_iowait_apply(sg_cpu, time, &util, &max);
 		next_f = get_next_freq(sg_policy, util, max);
 	}
@@ -647,7 +640,7 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	if (flags & SCHED_CPUFREQ_PL)
 		return;
 
-	sugov_get_util(&util, &max, sg_cpu->cpu, time);
+	sugov_get_util(&util, &max, sg_cpu->cpu);
 
 	flags &= ~SCHED_CPUFREQ_RT_DL;
 
