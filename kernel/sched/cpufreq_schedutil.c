@@ -19,6 +19,7 @@
 #include "sched.h"
 
 #define SUGOV_KTHREAD_PRIORITY	50
+#define IOWAIT_BOOST_MIN	(SCHED_CAPACITY_SCALE / 8)
 
 DEFINE_PER_CPU_READ_MOSTLY(unsigned long, response_time_mult);
 
@@ -63,7 +64,6 @@ struct sugov_cpu {
 
 	bool iowait_boost_pending;
 	unsigned int iowait_boost;
-	unsigned int iowait_boost_max;
 	u64 last_update;
 
 	struct sched_walt_cpu_load walt_load;
@@ -463,63 +463,77 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 	}
 }
 
-static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time)
+static bool sugov_iowait_reset(struct sugov_cpu *sg_cpu, u64 time,
+			       bool set_iowait_boost)
 {
-	/* Clear iowait_boost if the CPU appears to have been idle. */
-	if (sg_cpu->iowait_boost) {
-		s64 delta_ns = time - sg_cpu->last_update;
+	s64 delta_ns = time - sg_cpu->last_update;
 
-		/*
-		 * Clear boost if time has advanced beyond TICK_NSEC, or if
-		 * time went backwards (clock instability, TSC adjustment, etc).
-		 * Treating backwards time as idle prevents stale boost values.
-		 */
-		if (delta_ns > TICK_NSEC || delta_ns < 0) {
-			sg_cpu->iowait_boost = 0;
-			sg_cpu->iowait_boost_pending = false;
-		}
-	}
+	/* Reset boost only if a tick has elapsed (or clock stepped back) */
+	if (delta_ns >= 0 && delta_ns <= TICK_NSEC)
+		return false;
 
-	if (sg_cpu->flags & SCHED_CPUFREQ_IOWAIT) {
-		if (sg_cpu->iowait_boost_pending)
-			return;
+	sg_cpu->iowait_boost = set_iowait_boost ? IOWAIT_BOOST_MIN : 0;
+	sg_cpu->iowait_boost_pending = set_iowait_boost;
 
-		sg_cpu->iowait_boost_pending = true;
-
-		if (sg_cpu->iowait_boost) {
-			sg_cpu->iowait_boost <<= 1;
-			if (sg_cpu->iowait_boost > sg_cpu->iowait_boost_max)
-				sg_cpu->iowait_boost = sg_cpu->iowait_boost_max;
-		} else {
-			sg_cpu->iowait_boost = sg_cpu->sg_policy->policy->min;
-		}
-	}
+	return true;
 }
 
-static void sugov_iowait_boost(struct sugov_cpu *sg_cpu, unsigned long *util,
-			       unsigned long *max)
+static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time,
+				   unsigned int flags)
 {
-	unsigned int boost_util, boost_max;
+	bool set_iowait_boost = flags & SCHED_CPUFREQ_IOWAIT;
+
+	/* Reset boost if the CPU appears to have been idle enough */
+	if (sg_cpu->iowait_boost &&
+	    sugov_iowait_reset(sg_cpu, time, set_iowait_boost))
+		return;
+
+	/* Boost only tasks waking up after IO */
+	if (!set_iowait_boost)
+		return;
+
+	/* Ensure boost doubles only once per request */
+	if (sg_cpu->iowait_boost_pending)
+		return;
+	sg_cpu->iowait_boost_pending = true;
+
+	/* Double the boost at each request */
+	if (sg_cpu->iowait_boost) {
+		sg_cpu->iowait_boost = min_t(unsigned int,
+					     sg_cpu->iowait_boost << 1,
+					     SCHED_CAPACITY_SCALE);
+		return;
+	}
+
+	/* First wakeup after IO: start with minimum boost */
+	sg_cpu->iowait_boost = IOWAIT_BOOST_MIN;
+}
+
+static void sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time,
+			       unsigned long *util, unsigned long *max)
+{
+	unsigned int boost_util;
 
 	if (!sg_cpu->iowait_boost)
 		return;
 
-	if (sg_cpu->iowait_boost_pending) {
-		sg_cpu->iowait_boost_pending = false;
-	} else {
+	if (sugov_iowait_reset(sg_cpu, time, false))
+		return;
+
+	if (!sg_cpu->iowait_boost_pending) {
 		sg_cpu->iowait_boost >>= 1;
-		if (sg_cpu->iowait_boost < sg_cpu->sg_policy->policy->min) {
+		if (sg_cpu->iowait_boost < IOWAIT_BOOST_MIN) {
 			sg_cpu->iowait_boost = 0;
 			return;
 		}
 	}
 
-	boost_util = sg_cpu->iowait_boost;
-	boost_max = sg_cpu->iowait_boost_max;
+	sg_cpu->iowait_boost_pending = false;
 
-	if (*util * boost_max < *max * boost_util) {
+	boost_util = sg_cpu->iowait_boost;
+	if (*util * SCHED_CAPACITY_SCALE < *max * boost_util) {
 		*util = boost_util;
-		*max = boost_max;
+		*max = SCHED_CAPACITY_SCALE;
 	}
 }
 
@@ -536,7 +550,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		return;
 
 	flags &= ~SCHED_CPUFREQ_RT_DL;
-	sugov_set_iowait_boost(sg_cpu, time);
+	sugov_set_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
 
 	/*
@@ -555,7 +569,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		next_f = policy->cpuinfo.max_freq;
 	} else {
 		sugov_get_util(&util, &max, sg_cpu->cpu, time);
-		sugov_iowait_boost(sg_cpu, &util, &max);
+		sugov_iowait_apply(sg_cpu, time, &util, &max);
 		next_f = get_next_freq(sg_policy, util, max);
 	}
 	/*
@@ -616,7 +630,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 			max = j_max;
 		}
 
-		sugov_iowait_boost(j_sg_cpu, &util, &max);
+		sugov_iowait_apply(j_sg_cpu, time, &util, &max);
 	}
 
 	return get_next_freq(sg_policy, util, max);
@@ -643,7 +657,7 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	sg_cpu->max = max;
 	sg_cpu->flags = flags;
 
-	sugov_set_iowait_boost(sg_cpu, time);
+	sugov_set_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
 
 	if (sugov_should_update_freq(sg_policy, time) &&
@@ -1022,7 +1036,6 @@ static int sugov_start(struct cpufreq_policy *policy)
 		sg_cpu->cpu = cpu;
 		sg_cpu->sg_policy = sg_policy;
 		sg_cpu->flags = SCHED_CPUFREQ_DL;
-		sg_cpu->iowait_boost_max = policy->cpuinfo.max_freq;
 	}
 
 	for_each_cpu(cpu, policy->cpus) {
