@@ -102,7 +102,7 @@ bool cass_big_cpu(const struct cass_cpu_cand *c)
 static __always_inline
 bool cass_cpu_better(const struct cass_cpu_cand *a,
 		     const struct cass_cpu_cand *b, unsigned long p_util,
-		     int this_cpu, int prev_cpu, bool sync, bool prefer_idle)
+		     int this_cpu, int prev_cpu, bool sync, bool prefer_big)
 {
 #define cass_cmp(a, b) ({ res = (a) - (b); })
 #define cass_eq(a, b) ({ res = (a) == (b); })
@@ -128,11 +128,11 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 		goto done;
 
 	/*
-	 * For unboosted tasks that fit on little CPUs, prefer the little CPU
-	 * over the big CPU cluster to keep big CPUs available for latency-sensitive
-	 * work and heavy tasks.
+	 * For tasks that fit on little CPUs, prefer the little CPU cluster
+	 * over big CPUs unless the task is boosted (top-app) or is a
+	 * prefer-idle task with non-trivial load.
 	 */
-	if (!prefer_idle && cass_cmp(cass_big_cpu(b), cass_big_cpu(a)))
+	if (!prefer_big && cass_cmp(cass_big_cpu(b), cass_big_cpu(a)))
 		goto done;
 
 	/* Prefer the CPU with lower relative utilization */
@@ -170,7 +170,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	/* Initialize @best such that @best always has a valid CPU at the end */
 	struct cass_cpu_cand cands[2], *best = NULL;
 	int this_cpu = raw_smp_processor_id();
-	bool prefer_idle = !rt && schedtune_prefer_idle(p) > 0;
+	bool prefer_big;
 	unsigned long p_util;
 	bool has_idle = false;
 	int cidx = 0, cpu;
@@ -183,6 +183,9 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	 * boosted_cpu_util() for DVFS frequency scaling.
 	 */
 	p_util = rt ? 0 : task_util_est(p);
+	prefer_big = !rt && (schedtune_task_boost(p) > 0 ||
+		(schedtune_prefer_idle(p) > 0 &&
+		 p_util > (arch_scale_cpu_capacity(NULL, 0) >> 3)));
 
 	/*
 	 * Find the best CPU to wake @p on. Although idle_get_state() requires
@@ -274,7 +277,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		 */
 		if (!best || best == curr ||
 		    cass_cpu_better(curr, best, p_util, this_cpu, prev_cpu,
-				    sync, prefer_idle)) {
+				    sync, prefer_big)) {
 			best = curr;
 			cidx ^= 1;
 		}
