@@ -153,6 +153,7 @@ struct nvt_ts_data {
 	u32 lat_max_us;
 	u64 lat_total_us;
 	bool irq_enabled;
+	bool irq_wake_enabled;
 	bool charger_plugged;
 	struct work_struct charger_work;
 #if WAKEUP_GESTURE

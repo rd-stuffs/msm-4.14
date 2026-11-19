@@ -1449,6 +1449,7 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 	}
 
 	if (keycode > 0) {
+		pm_wakeup_event(&ts->input_dev->dev, 2000);
 		input_report_key(ts->input_dev, keycode, 1);
 		input_sync(ts->input_dev);
 		input_report_key(ts->input_dev, keycode, 0);
@@ -2346,16 +2347,16 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	INIT_WORK(&ts->charger_work, nvt_ts_charger_work_func);
 	ts->charger_plugged = nvt_charger_connected;
 
+#ifdef CONFIG_PM
+	ts->dev_pm_suspend = false;
+	init_completion(&ts->dev_pm_suspend_completion);
+#endif
+
 	nvt_irq_enable(true);
 
 	mutex_lock(&ts->lock);
 	nvt_apply_gaming_defaults(ts);
 	mutex_unlock(&ts->lock);
-
-#ifdef CONFIG_PM
-	ts->dev_pm_suspend = false;
-	init_completion(&ts->dev_pm_suspend_completion);
-#endif
 
 	pm_runtime_enable(&ts->client->dev);
 
@@ -2639,7 +2640,10 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		buf[0] = EVENT_MAP_HOST_CMD;
 		buf[1] = 0x13;
 		CTP_SPI_WRITE(ts->client, buf, 2);
-		enable_irq_wake(ts->client->irq);
+		if (!ts->irq_wake_enabled) {
+			enable_irq_wake(ts->client->irq);
+			ts->irq_wake_enabled = true;
+		}
 		NVT_LOG("Enabled touch wakeup gesture\n");
 	} else {
 		//---write command to enter "deep sleep mode"---
@@ -2714,6 +2718,10 @@ static int32_t nvt_ts_resume(struct device *dev)
 	}
 
 #if WAKEUP_GESTURE
+	if (ts->irq_wake_enabled) {
+		disable_irq_wake(ts->client->irq);
+		ts->irq_wake_enabled = false;
+	}
 	if (!ts->is_gesture_mode) {
 		nvt_irq_enable(true);
 #if 0
@@ -2868,8 +2876,9 @@ static int nvt_pm_suspend(struct device *dev)
 {
 	struct nvt_ts_data *ts = dev_get_drvdata(dev);
 
-	ts->dev_pm_suspend = true;
+	disable_irq(ts->client->irq);
 	reinit_completion(&ts->dev_pm_suspend_completion);
+	ts->dev_pm_suspend = true;
 	NVT_LOG("pm suspend");
 
 	return 0;
@@ -2880,7 +2889,8 @@ static int nvt_pm_resume(struct device *dev)
 	struct nvt_ts_data *ts = dev_get_drvdata(dev);
 
 	ts->dev_pm_suspend = false;
-	complete(&ts->dev_pm_suspend_completion);
+	complete_all(&ts->dev_pm_suspend_completion);
+	enable_irq(ts->client->irq);
 	NVT_LOG("pm resume");
 
 	return 0;
