@@ -6797,9 +6797,8 @@ schedtune_task_margin(struct task_struct *task)
 #endif /* CONFIG_SCHED_TUNE */
 
 unsigned long
-boosted_cpu_util(int cpu, struct sched_walt_cpu_load *walt_load)
+schedtune_apply_cpu_margin(unsigned long util, int cpu)
 {
-	unsigned long util = cpu_util_freq(cpu, walt_load);
 	long margin = schedtune_cpu_margin(util, cpu);
 
 	trace_sched_boost_cpu(cpu, util, margin);
@@ -6808,6 +6807,12 @@ boosted_cpu_util(int cpu, struct sched_walt_cpu_load *walt_load)
 		return util + margin;
 	else
 		return util;
+}
+
+unsigned long
+boosted_cpu_util(int cpu, struct sched_walt_cpu_load *walt_load)
+{
+	return schedtune_apply_cpu_margin(cpu_util_freq(cpu, walt_load), cpu);
 }
 
 static inline unsigned long

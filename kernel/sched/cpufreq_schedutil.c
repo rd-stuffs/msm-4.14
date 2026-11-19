@@ -450,9 +450,9 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 	max_cap = arch_scale_cpu_capacity(NULL, cpu);
 	*max = max_cap;
 
-	*util = boosted_cpu_util(cpu, &loadcpu->walt_load);
-
 	if (likely(use_pelt())) {
+		unsigned long raw_util = cpu_util_freq(cpu, &loadcpu->walt_load);
+
 		sched_avg_update(rq);
 		delta = time - rq->age_stamp;
 		if (unlikely(delta < 0))
@@ -460,9 +460,15 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 		rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
 		rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
 		/*
-		 * Speed up/slow down response timee first then apply DVFS headroom.
+		 * Scale PELT utilization by response time before adding the
+		 * instantaneous SchedTune margin so boost headroom isn't
+		 * amplified by response_time_mult on high-capacity clusters.
 		 */
-		*util = min(sugov_apply_dvfs_headroom(sugov_apply_response_time(*util + rt, cpu), cpu), max_cap);
+		raw_util = min(sugov_apply_response_time(raw_util + rt, cpu), max_cap);
+		raw_util = min(schedtune_apply_cpu_margin(raw_util, cpu), max_cap);
+		*util = min(sugov_apply_dvfs_headroom(raw_util, cpu), max_cap);
+	} else {
+		*util = boosted_cpu_util(cpu, &loadcpu->walt_load);
 	}
 }
 
