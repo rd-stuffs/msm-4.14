@@ -961,7 +961,7 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		return 0;
 
 	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
-		elapsed_us = ktime_us_delta(ktime_get(),
+		elapsed_us = ktime_us_delta(ktime_get_boottime(),
 				pon->kpdpwr_last_release_time);
 		if (elapsed_us < pon->dbc_time_us) {
 			pr_debug("Ignoring kpdpwr event; within debounce time\n");
@@ -995,9 +995,10 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		pon_rt_sts);
 	key_status = pon_rt_sts & pon_rt_bit;
 
-	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
-		if (!key_status)
-			pon->kpdpwr_last_release_time = ktime_get();
+	if (cfg->pon_type == PON_KPDPWR) {
+		pm_wakeup_event(pon->dev, 2000);
+		if (pon->kpdpwr_dbc_enable && !key_status)
+			pon->kpdpwr_last_release_time = ktime_get_boottime();
 	}
 
 	/*
